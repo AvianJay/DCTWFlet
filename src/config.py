@@ -215,7 +215,7 @@ def get_servers(force=False):
         response.raise_for_status()
         servers = response.json()
         # sort by bump_at (datetime TZ)
-        servers.sort(key=lambda x: datetime.fromisoformat(x.get("bump_at", "")).astimezone(), reverse=True)
+        # servers.sort(key=lambda x: datetime.fromisoformat(x.get("bump_at", "")).astimezone(), reverse=True)
         cache("servers", servers, mode="w", expire=600)
         return servers
     except requests.RequestException as e:
@@ -232,7 +232,7 @@ def get_templates(force=False):
         response.raise_for_status()
         templates = response.json()
         # sort by bump_at (datetime TZ)
-        templates.sort(key=lambda x: datetime.fromisoformat(x.get("bump_at", "")).astimezone(), reverse=True)
+        # templates.sort(key=lambda x: datetime.fromisoformat(x.get("bump_at", "")).astimezone(), reverse=True)
         cache("templates", templates, mode="w", expire=600)
         return templates
     except requests.RequestException as e:
