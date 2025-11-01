@@ -3,12 +3,12 @@
 亂做的 DCTW 應用程式。
 
 ## 下載最新成功構建的檔案
-[Android](https://nightly.link/AvianJay/DCTWFlet/workflows/build/main/DCTWflet-android.zip)
-[iOS](https://nightly.link/AvianJay/DCTWFlet/workflows/build/main/DCTWflet-ios.zip)
-[Windows](https://nightly.link/AvianJay/DCTWFlet/workflows/build/main/DCTWflet-windows.zip)
-[macOS](https://nightly.link/AvianJay/DCTWFlet/workflows/build/main/DCTWflet-macos.zip)
-[Linux](https://nightly.link/AvianJay/DCTWFlet/workflows/build/main/DCTWflet-linux.zip)
-[Web](https://nightly.link/AvianJay/DCTWFlet/workflows/build/main/DCTWflet-web.zip)
+[Android](https://nightly.link/AvianJay/DCTWFlet/workflows/build/main/DCTWFlet-android.zip)
+[iOS](https://nightly.link/AvianJay/DCTWFlet/workflows/build/main/DCTWFlet-ios.zip)
+[Windows](https://nightly.link/AvianJay/DCTWFlet/workflows/build/main/DCTWFlet-windows.zip)
+[macOS](https://nightly.link/AvianJay/DCTWFlet/workflows/build/main/DCTWFlet-macos.zip)
+[Linux](https://nightly.link/AvianJay/DCTWFlet/workflows/build/main/DCTWFlet-linux.zip)
+[Web](https://nightly.link/AvianJay/DCTWFlet/workflows/build/main/DCTWFlet-web.zip)
 
 ## Run the app
 
