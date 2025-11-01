@@ -121,7 +121,7 @@ def main(page: ft.Page):
                     [
                         ft.Container(
                             content=ft.Image(
-                                src=config.cache_image(bot["banner"], size=256),
+                                src=config.cache_image(bot["banner"], size=1024),
                                 fit=ft.ImageFit.FIT_WIDTH,
                             ),
                             height=256,
@@ -129,7 +129,7 @@ def main(page: ft.Page):
                         ),
                         ft.Container(
                             content=ft.CircleAvatar(
-                                foreground_image_src=config.cache_image(bot["avatar"], size=128),
+                                foreground_image_src=config.cache_image(bot["avatar"], size=256),
                                 radius=64,
                             ),
                             alignment=ft.alignment.bottom_center,
@@ -140,6 +140,13 @@ def main(page: ft.Page):
                     height=256 + 64,
                 ),
             )
+            verified = bot.get("verified", False)
+            verified = bool(verified)
+            try:
+                is_partner = config.is_partner(bot["id"])
+            except Exception as e:
+                print(f"Error checking if bot is partner: {e}")
+                is_partner = False
             bot_view.controls.append(
                 ft.Row(
                     [
@@ -149,10 +156,17 @@ def main(page: ft.Page):
                             weight=ft.FontWeight.BOLD,
                             text_align=ft.TextAlign.CENTER
                         ),
+                        *(
+                            [ft.ElevatedButton(text="Discord官方驗證", icon=ft.Icons.VERIFIED, bgcolor=ft.Colors.BLUE)] if verified else []
+                        ),
+                        *(
+                            [ft.ElevatedButton(text="DCTW合作夥伴", icon=ft.Icons.STAR, bgcolor=ft.Colors.GREEN)] if is_partner else []
+                        )
                     ],
                     alignment=ft.MainAxisAlignment.CENTER,
                 )
             )
+            tags = bot.get("tags", "").split(",")
             bot_view.controls.append(
                 ft.Column(
                     [
@@ -188,6 +202,8 @@ def main(page: ft.Page):
                             ],
                             alignment=ft.MainAxisAlignment.CENTER,
                         ),
+                        # tags
+                        
                         ft.Markdown(
                             bot["introduce"],
                             fit_content=False,
