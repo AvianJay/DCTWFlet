@@ -58,7 +58,7 @@ def main(page: ft.Page):
         for bot in bots:
             bots_column.content.controls.append(
                 ft.ListTile(
-                    leading=ft.CircleAvatar(foreground_image_src=config.cache_image(bot["avatar"], size=128)),
+                    leading=ft.CircleAvatar(foreground_image_src=config.cache_image(bot["avatar_url"], size=128)),
                     title=ft.Text(bot["name"]),
                     subtitle=ft.Text(bot["description"]),
                     key=str(bot["id"]),
@@ -73,7 +73,7 @@ def main(page: ft.Page):
         for server in servers:
             servers_column.content.controls.append(
                 ft.ListTile(
-                    leading=ft.CircleAvatar(foreground_image_src=config.cache_image(server["avatar"], size=128)),
+                    leading=ft.CircleAvatar(foreground_image_src=config.cache_image(server["icon_url"], size=128)),
                     title=ft.Text(server["name"]),
                     subtitle=ft.Text(server["description"]),
                     key=str(server["id"]),
@@ -129,7 +129,7 @@ def main(page: ft.Page):
                         ),
                         ft.Container(
                             content=ft.CircleAvatar(
-                                foreground_image_src=config.cache_image(bot["avatar"], size=256),
+                                foreground_image_src=config.cache_image(bot["avatar_url"], size=256),
                                 radius=64,
                             ),
                             alignment=ft.alignment.bottom_center,
@@ -141,12 +141,7 @@ def main(page: ft.Page):
                 ),
             )
             verified = bot.get("verified", False)
-            verified = bool(verified)
-            try:
-                is_partner = config.is_partner(bot["id"])
-            except Exception as e:
-                print(f"Error checking if bot is partner: {e}")
-                is_partner = False
+            is_partner = bot.get("is_partnered", False)
             bot_view.controls.append(
                 ft.Row(
                     [
@@ -187,17 +182,17 @@ def main(page: ft.Page):
                                 ft.ElevatedButton(
                                     icon=ft.Icons.PERSON_ADD,
                                     text="邀請機器人",
-                                    on_click=lambda e: page.launch_url(bot["inviteLink"]),
+                                    on_click=lambda e: page.launch_url(bot["invite_url"]),
                                 ),
                                 ft.ElevatedButton(
                                     icon=ft.Icons.HELP_CENTER,
                                     text="支援伺服器",
-                                    on_click=lambda e: page.launch_url(bot["serverLink"]),
+                                    on_click=lambda e: page.launch_url(bot["server_url"]),
                                 ),
                                 ft.ElevatedButton(
                                     icon=ft.Icons.LINK,
                                     text="官方網站",
-                                    on_click=lambda e: page.launch_url(bot["webLink"]),
+                                    on_click=lambda e: page.launch_url(bot["web_url"]),
                                 ),
                             ],
                             alignment=ft.MainAxisAlignment.CENTER,
@@ -243,7 +238,7 @@ def main(page: ft.Page):
                     [
                         ft.Container(
                             content=ft.Image(
-                                src=config.cache_image(server["banner"], size=1024),
+                                src=config.cache_image(server["banner_url"], size=1024),
                                 fit=ft.ImageFit.FIT_WIDTH,
                             ),
                             width=page.width,
@@ -251,7 +246,7 @@ def main(page: ft.Page):
                         ),
                         ft.Container(
                             content=ft.CircleAvatar(
-                                foreground_image_src=config.cache_image(server["avatar"], size=256),
+                                foreground_image_src=config.cache_image(server["icon_url"], size=256),
                                 radius=64,
                             ),
                             alignment=ft.alignment.bottom_center,
@@ -292,7 +287,7 @@ def main(page: ft.Page):
                                 ft.ElevatedButton(
                                     icon=ft.Icons.ADD,
                                     text="加入伺服器",
-                                    on_click=lambda e: page.launch_url(server["inviteLink"]),
+                                    on_click=lambda e: page.launch_url(server["invite_url"]),
                                 ),
                             ],
                             alignment=ft.MainAxisAlignment.CENTER,
@@ -365,7 +360,7 @@ def main(page: ft.Page):
                                 ft.ElevatedButton(
                                     icon=ft.Icons.ADD,
                                     text="使用模板",
-                                    on_click=lambda e: page.launch_url(template["shareLink"]),
+                                    on_click=lambda e: page.launch_url(template["share_url"]),
                                 ),
                             ],
                             alignment=ft.MainAxisAlignment.CENTER,
@@ -462,6 +457,13 @@ def main(page: ft.Page):
                                     value=config.config("app_update_check"),
                                     on_change=lambda e: config.config("app_update_check", e.control.value, "w"),
                                 ),
+                                # api key
+                                ft.Text("dctw.nyanko.host API Key（一般來講無須更改）"),
+                                ft.TextField(
+                                    label="API Key",
+                                    value=config.config("apikey"),
+                                    on_change=lambda e: config.config("apikey", e.control.value, "w"),
+                                ),
                                 # version info
                                 ft.Text(f"應用程式版本: {config.full_version}"),
                                 ft.ElevatedButton(
@@ -511,12 +513,18 @@ def main(page: ft.Page):
         home_view.controls.clear()
         config.config("home_index", index, "w")
         if index == 0:
+            page.title = "DCTW - 機器人"
+            home_view.appbar.title = ft.Text("機器人清單")
             home_view.controls.append(bots_column)
             threading.Thread(target=update_bots, args=(None, False)).start()
         elif index == 1:
+            page.title = "DCTW - 伺服器"
+            home_view.appbar.title = ft.Text("伺服器清單")
             home_view.controls.append(servers_column)
             threading.Thread(target=update_servers, args=(None, False)).start()
         elif index == 2:
+            page.title = "DCTW - 伺服器模板"
+            home_view.appbar.title = ft.Text("伺服器模板清單")
             home_view.controls.append(templates_column)
             threading.Thread(target=update_templates, args=(None, False)).start()
         page.update()
