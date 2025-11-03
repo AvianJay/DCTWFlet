@@ -67,6 +67,50 @@ jobs:
         with:
           name: DCTWFlet-android
           path: build/apk
+  
+  build-android-aab:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Get short Git commit hash
+        run: echo "COMMIT_HASH=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Replace hash and update channel in config.py
+        run: |
+          sed -i 's/hash = ".*"/hash = "'$COMMIT_HASH'"/' src/config.py
+          sed -i 's/update_channel = ".*"/update_channel = "release"/' src/config.py
+
+      - name: Set up Python 3.x
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install poetry
+          poetry install
+
+      - name: Decode keystore
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > sign.jks
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+
+      - name: Build AAB
+        run: |
+          poetry run flet build aab --verbose --no-rich-output --compile-app --compile-packages --android-signing-key-store "$PWD/sign.jks" --android-signing-key-store-password "$KEYSTORE_PASSWORD" --android-signing-key-password "$KEYSTORE_PASSWORD" --android-signing-key-alias "$KEY_ALIAS"
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: DCTWFlet-android-aab
+          path: build/aab
 
   build-ios:
     runs-on: macos-15
@@ -300,7 +344,7 @@ jobs:
     
   release-android-apks:
     name: Release APKs to GitHub
-    needs: [build-android, build-ios, build-macos, build-windows, build-linux, build-web, deploy]
+    needs: [build-android, build-android-aab, build-ios, build-macos, build-windows, build-linux, build-web, deploy]
     runs-on: ubuntu-latest
     permissions:
       contents: write
