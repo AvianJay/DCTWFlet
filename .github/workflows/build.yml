@@ -214,6 +214,7 @@ jobs:
         run: echo "COMMIT_HASH=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
       - name: Replace hash and update channel in config.py
+        shell: bash
         run: |
           sed -i 's/hash = ".*"/hash = "'$COMMIT_HASH'"/' src/config.py
           sed -i 's/update_channel = ".*"/update_channel = "nightly"/' src/config.py
