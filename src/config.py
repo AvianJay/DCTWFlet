@@ -129,6 +129,8 @@ def _cache_image(url):
             content_type = requests.head(url).headers.get('Content-Type')
             extension = mimetypes.guess_extension(content_type) if content_type else ''
         image_path += extension
+        if os.path.exists(image_path):
+            return image_path
         response = requests.get(url, stream=True)
         response.raise_for_status()
         with open(image_path, 'wb') as out_file:
@@ -136,8 +138,10 @@ def _cache_image(url):
         images = cache("images", mode="r") or {}
         images[original_url] = image_path
         cache("images", images, mode="w")
+        return image_path
     except requests.RequestException as e:
         print(f"Error caching image from {url}: {e}")
+        return None
 
 def cache_image(url, callback=None, size=None):
     images_dir = os.path.join(datadir, "images")
@@ -153,27 +157,21 @@ def cache_image(url, callback=None, size=None):
         query_params["size"] = size
         url = urlunparse(url_parts._replace(query=urlencode(query_params, doseq=True)))
 
-    images = cache("images", mode="r") or {}
+    # images = cache("images", mode="r") or {}
+    id = "".join(random.choices(string.ascii_letters + string.digits, k=16))
+    image_ids[id] = url
+    url = f"http://127.0.0.1:{port}/image/{id}"
+    return url
 
-    if url in images:
-        # to image cache server
-        id = "".join(random.choices(string.ascii_letters + string.digits, k=16))
-        image_ids[id] = url
-        images[url] = f"http://127.0.0.1:{port}/image/{id}"
-        if callback:
-            callback()
-        print("Image found in cache:", images[url])
-        return images[url]
-    else:
-        if callback:
-            def _cache_image_with_callback(url, callback):
-                _cache_image(url)
-                callback()
-            threading.Thread(target=_cache_image_with_callback, args=(url, callback)).start()
-        else:
-            threading.Thread(target=_cache_image, args=(url,)).start()
-            print(f"Caching image in background: {url}")
-            return url  # Return original URL until cached image is ready
+def clear_cache():
+    try:
+        clear_image_cache()
+        with open(os.path.join(datadir, "cache.json"), "w") as f:
+            json.dump({}, f)
+        return True
+    except Exception as e:
+        print(f"Error clearing cache: {e}")
+        return False
 
 def clear_image_cache():
     images_dir = os.path.join(datadir, "images")
@@ -185,7 +183,7 @@ def clear_image_cache():
                     os.unlink(file_path)
             except Exception as e:
                 print(f"Error deleting cached image {file_path}: {e}")
-    cache("images", mode="w", value={})
+    # cache("images", mode="w", value={})
 
 bots, servers, templates = [], [], []
 
@@ -210,7 +208,7 @@ def get_bots(force=False):
             if not bot.get("bumped_at"):
                 bot["bumped_at"] = "1999-01-01T00:00:00Z"
         bots.sort(key=lambda x: datetime.fromisoformat(x.get("bumped_at", "1999-01-01T00:00:00Z")).astimezone(), reverse=True)
-        cache("bots", bots, mode="w", expire=600)
+        cache("bots", bots, mode="w", expire=60)
         return bots
     except requests.RequestException as e:
         print(f"Error fetching bots: {e}")
@@ -233,7 +231,7 @@ def get_servers(force=False):
             if not server.get("bumped_at"):
                 server["bumped_at"] = "1999-01-01T00:00:00Z"
         servers.sort(key=lambda x: datetime.fromisoformat(x.get("bumped_at", "1999-01-01T00:00:00Z")).astimezone(), reverse=True)
-        cache("servers", servers, mode="w", expire=600)
+        cache("servers", servers, mode="w", expire=60)
         return servers
     except requests.RequestException as e:
         print(f"Error fetching servers: {e}")
@@ -256,7 +254,7 @@ def get_templates(force=False):
             if "bumped_at" not in template or not template["bumped_at"]:
                 template["bumped_at"] = "1999-01-01T00:00:00Z"
         templates.sort(key=lambda x: datetime.fromisoformat(x.get("bumped_at", "1999-01-01T00:00:00Z")).astimezone(), reverse=True)
-        cache("templates", templates, mode="w", expire=600)
+        cache("templates", templates, mode="w", expire=60)
         return templates
     except requests.RequestException as e:
         print(f"Error fetching templates: {e}")
@@ -278,12 +276,9 @@ def is_partner(id, type="bots"):
 image_ids = {}
 @app.route('/image/<path:id>')
 def image_cache(id):
-    images = cache("images", mode="r") or {}
+    # images = cache("images", mode="r") or {}
     url = image_ids.get(id, id)
-    if url in images:
-        return send_file(images[url])
-    else:
-        return "Image not found", 404
+    return send_file(_cache_image(url))
 
 def run_image_cache_server():
     app.run(host="127.0.0.1", port=port)
