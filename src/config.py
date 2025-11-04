@@ -99,10 +99,10 @@ def cache(key, value=None, mode="r", expire=None, force=False):
                 if cache_item["expire"] is None or cache_item["expire"] > datetime.now().timestamp() or force:
                     cache_limiter.release()
                     return cache_item["value"]
-                else:
-                    del cache_data[key]
-                    with open(cache_path, "w") as f:
-                        json.dump(cache_data, f)
+                # else:
+                #     del cache_data[key]
+                #     with open(cache_path, "w") as f:
+                #         json.dump(cache_data, f)
             cache_limiter.release()
             return None
         elif mode == "w":
@@ -252,6 +252,19 @@ def get_bots(sort=SortOrder.BUMPED, tag=None, force=False):
             return c
         return []
 
+def get_bot_comments(bot_id):
+    try:
+        response = requests.get(
+            f"https://dctw.nyanko.host/api/v1/bots/{bot_id}/comments",
+            headers={"User-Agent": f"DCTWFlet/{app_version}", "x-api-key": config("apikey", "")}
+        )
+        response.raise_for_status()
+        comments = response.json()["data"]
+        return comments
+    except requests.RequestException as e:
+        print(f"Error fetching bot comments: {e}")
+        return []
+
 def get_servers(sort=SortOrder.BUMPED, tag=None, force=False):
     global servers
     if not force:
@@ -283,6 +296,35 @@ def get_servers(sort=SortOrder.BUMPED, tag=None, force=False):
         return servers
     except requests.RequestException as e:
         print(f"Error fetching servers: {e}")
+        page.open(
+            ft.SnackBar(
+                ft.Text("無法取得伺服器列表，請檢查網路連線或 API Key 是否正確。"),
+                bgcolor=ft.Colors.RED,
+            )
+        )
+        c = cache("servers", force=True)
+        if c:
+            return c
+        return []
+
+def get_server_comments(server_id):
+    try:
+        response = requests.get(
+            f"https://dctw.nyanko.host/api/v1/servers/{server_id}/comments",
+            headers={"User-Agent": f"DCTWFlet/{app_version}", "x-api-key": config("apikey", "")}
+        )
+        response.raise_for_status()
+        comments = response.json()["data"]
+        return comments
+    except requests.RequestException as e:
+        print(f"Error fetching server comments: {e}")
+        page.open(
+            ft.SnackBar(
+                ft.Text("無法取得伺服器評論，請檢查網路連線或 API Key 是否正確。"),
+                bgcolor=ft.Colors.RED,
+            )
+        )
+        return []
 
 def get_templates(sort=SortOrder.BUMPED, tag=None, force=False):
     global templates
@@ -313,6 +355,35 @@ def get_templates(sort=SortOrder.BUMPED, tag=None, force=False):
         return templates
     except requests.RequestException as e:
         print(f"Error fetching templates: {e}")
+        page.open(
+            ft.SnackBar(
+                ft.Text("無法取得模板列表，請檢查網路連線或 API Key 是否正確。"),
+                bgcolor=ft.Colors.RED,
+            )
+        )
+        c = cache("templates", force=True)
+        if c:
+            return c
+        return []
+
+def get_template_comments(template_id):
+    try:
+        response = requests.get(
+            f"https://dctw.nyanko.host/api/v1/templates/{template_id}/comments",
+            headers={"User-Agent": f"DCTWFlet/{app_version}", "x-api-key": config("apikey", "")}
+        )
+        response.raise_for_status()
+        comments = response.json()["data"]
+        return comments
+    except requests.RequestException as e:
+        print(f"Error fetching template comments: {e}")
+        page.open(
+            ft.SnackBar(
+                ft.Text("無法取得模板評論，請檢查網路連線或 API Key 是否正確。"),
+                bgcolor=ft.Colors.RED,
+            )
+        )
+        return []
 
 def is_partner(id, type="bots"):
     response = requests.post(
