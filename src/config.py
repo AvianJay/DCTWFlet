@@ -77,8 +77,10 @@ def config(key, value=None, mode="r"):
     else:
         raise ValueError(f"Invalid mode: {mode}")
 
+page = None  # will be set in main.py
+
 cache_limiter = threading.Semaphore(1)
-def cache(key, value=None, mode="r", expire=None):
+def cache(key, value=None, mode="r", expire=None, force=False):
     cache_limiter.acquire()
     try:
         cache_path = os.path.join(datadir, "cache.json")
@@ -92,7 +94,7 @@ def cache(key, value=None, mode="r", expire=None):
         if mode == "r":
             cache_item = cache_data.get(key)
             if cache_item:
-                if cache_item["expire"] is None or cache_item["expire"] > datetime.now().timestamp():
+                if cache_item["expire"] is None or cache_item["expire"] > datetime.now().timestamp() or force:
                     cache_limiter.release()
                     return cache_item["value"]
                 else:
@@ -220,6 +222,16 @@ def get_bots(force=False):
         return bots
     except requests.RequestException as e:
         print(f"Error fetching bots: {e}")
+        page.open(
+            ft.SnackBar(
+                ft.Text("無法取得機器人列表，請檢查網路連線或 API Key 是否正確。"),
+                bgcolor=ft.Colors.RED,
+            )
+        )
+        c = cache("bots", force=True)
+        if c:
+            return c
+        return []
 
 def get_servers(force=False):
     global servers

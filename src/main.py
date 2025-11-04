@@ -5,6 +5,8 @@ import threading
 
 def main(page: ft.Page):
     page.title = "DCTW"
+    page.padding = ft.padding.all(0)
+    config.page = page
     
     # theme
     def update_theme(theme=config.config("theme")):
@@ -103,19 +105,28 @@ def main(page: ft.Page):
             type_map[index](e, force=True)
     
     def show_bot_detail(bot_id):
-        bot_view = ft.View(f"/bot/{bot_id}", vertical_alignment=ft.MainAxisAlignment.START)
+        bot_view = ft.View(f"/bot/{bot_id}", vertical_alignment=ft.MainAxisAlignment.START, padding=ft.padding.all(0))
         bot_view.scroll = ft.ScrollMode.AUTO
         bot = next((b for b in config.get_bots() if b["id"] == bot_id), None)
         if bot:
-            bot_view.appbar = ft.AppBar(
-                # title=ft.Text(bot["name"]),
+            # bot_view.appbar = ft.AppBar(
+            #     # title=ft.Text(bot["name"]),
+            #     bgcolor=ft.Colors.TRANSPARENT,
+            #     leading=ft.IconButton(
+            #         icon=ft.Icons.ARROW_BACK,
+            #         on_click=lambda e: page.go("/"),
+            #     ),
+            #     automatically_imply_leading=False,
+            # )
+            bot_view.floating_action_button = ft.FloatingActionButton(
+                icon=ft.Icons.ARROW_BACK,
+                on_click=lambda e: page.go("/"),
                 bgcolor=ft.Colors.TRANSPARENT,
-                leading=ft.IconButton(
-                    icon=ft.Icons.ARROW_BACK,
-                    on_click=lambda e: page.go("/"),
-                ),
-                automatically_imply_leading=False,
+                shape=ft.CircleBorder(),
+                tooltip="返回",
+                offset=ft.Offset(-0.3, 0),
             )
+            bot_view.floating_action_button_location = ft.FloatingActionButtonLocation.START_TOP
             bot_view.controls.append(
                 ft.Stack(
                     [
@@ -175,6 +186,7 @@ def main(page: ft.Page):
                         )
                     ],
                     alignment=ft.MainAxisAlignment.CENTER,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER
                 )
             )
             bot_view.controls.append(
@@ -197,6 +209,7 @@ def main(page: ft.Page):
                                 ft.ElevatedButton(text=config.bot_tags[tag][0], icon=config.bot_tags[tag][1]) for tag in bot.get("tags", [])
                             ],
                             alignment=ft.MainAxisAlignment.CENTER,
+                            vertical_alignment=ft.CrossAxisAlignment.CENTER
                         ),
                         # inviteLink button
                         ft.Row(
@@ -225,10 +238,13 @@ def main(page: ft.Page):
                         ),
                         # tags
                         
-                        ft.Markdown(
-                            bot["introduce"],
-                            fit_content=False,
-                            on_tap_link=lambda e: page.launch_url(e.data),
+                        ft.Container(
+                            content=ft.Markdown(
+                                bot["introduce"],
+                                fit_content=False,
+                                on_tap_link=lambda e: page.launch_url(e.data),
+                            ),
+                            padding=ft.padding.all(10),
                         )
                     ],
                     alignment=ft.MainAxisAlignment.START,
@@ -246,19 +262,28 @@ def main(page: ft.Page):
             page.go("/")
     
     def show_server_detail(server_id):
-        server_view = ft.View(f"/server/{server_id}", vertical_alignment=ft.MainAxisAlignment.START)
+        server_view = ft.View(f"/server/{server_id}", vertical_alignment=ft.MainAxisAlignment.START, padding=ft.padding.all(0))
         server_view.scroll = ft.ScrollMode.AUTO
         server = next((s for s in config.get_servers() if s["id"] == server_id), None)
         if server:
-            server_view.appbar = ft.AppBar(
-                title=ft.Text(server["name"]),
+            # server_view.appbar = ft.AppBar(
+            #     title=ft.Text(server["name"]),
+            #     bgcolor=ft.Colors.TRANSPARENT,
+            #     leading=ft.IconButton(
+            #         icon=ft.Icons.ARROW_BACK,
+            #         on_click=lambda e: page.go("/"),
+            #     ),
+            #     automatically_imply_leading=False,
+            # )
+            server_view.floating_action_button = ft.FloatingActionButton(
+                icon=ft.Icons.ARROW_BACK,
+                on_click=lambda e: page.go("/"),
                 bgcolor=ft.Colors.TRANSPARENT,
-                leading=ft.IconButton(
-                    icon=ft.Icons.ARROW_BACK,
-                    on_click=lambda e: page.go("/"),
-                ),
-                automatically_imply_leading=False,
+                shape=ft.CircleBorder(),
+                tooltip="返回",
+                offset=ft.Offset(-0.3, 0),
             )
+            server_view.floating_action_button_location = ft.FloatingActionButtonLocation.START_TOP
             server_view.controls.append(
                 ft.Stack(
                     [
@@ -298,6 +323,7 @@ def main(page: ft.Page):
                         ),
                     ],
                     alignment=ft.MainAxisAlignment.CENTER,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER
                 )
             )
             server_view.controls.append(
@@ -331,14 +357,18 @@ def main(page: ft.Page):
                             ],
                             alignment=ft.MainAxisAlignment.CENTER,
                         ),
-                        ft.Markdown(
-                            server["introduce"],
-                            fit_content=False,
-                            on_tap_link=lambda e: page.launch_url(e.data),
+                        ft.Container(
+                            content=ft.Markdown(
+                                server["introduce"],
+                                fit_content=False,
+                                on_tap_link=lambda e: page.launch_url(e.data),
+                            ),
+                            padding=ft.padding.all(10),
                         )
                     ],
                     alignment=ft.MainAxisAlignment.START,
                     scroll=ft.ScrollMode.AUTO,
+                    vertical_alignment=ft.CrossAxisAlignment.START
                 )
             )
             server_view.controls.append(
