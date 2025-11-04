@@ -346,6 +346,7 @@ def main(page: ft.Page):
                                 ft.ElevatedButton(text=config.server_tags[tag][0], icon=config.server_tags[tag][1]) for tag in server.get("tags", [])
                             ],
                             alignment=ft.MainAxisAlignment.CENTER,
+                            vertical_alignment=ft.CrossAxisAlignment.START
                         ),
                         ft.Row(
                             [
@@ -368,7 +369,6 @@ def main(page: ft.Page):
                     ],
                     alignment=ft.MainAxisAlignment.START,
                     scroll=ft.ScrollMode.AUTO,
-                    vertical_alignment=ft.CrossAxisAlignment.START
                 )
             )
             server_view.controls.append(
