@@ -60,7 +60,23 @@ def main(page: ft.Page):
         for bot in bots:
             bots_column.content.controls.append(
                 ft.ListTile(
-                    leading=ft.CircleAvatar(foreground_image_src=config.cache_image(bot["avatar_url"], size=128)),
+                    leading=ft.Container(
+                        content=ft.Stack(
+                            [
+                                ft.CircleAvatar(foreground_image_src=config.cache_image(bot["avatar_url"], size=128)),
+                                ft.Container(
+                                    content=ft.CircleAvatar(
+                                        bgcolor=config.status_colors.get(bot.get("status", "offline"), ft.Colors.GREY),
+                                        radius=7,
+                                    ),
+                                    on_click=lambda e: page.open(ft.SnackBar(content=ft.Text(f"機器人狀態: {config.status_texts.get(bot.get('status', 'offline'), '未知')}"))),
+                                    alignment=ft.alignment.bottom_right,
+                                )
+                            ]
+                        ),
+                        width=40,
+                        height=40,
+                    ),
                     title=ft.Text(bot["name"]),
                     subtitle=ft.Text(bot.get("description", "")),
                     key=str(bot["id"]),
@@ -191,10 +207,10 @@ def main(page: ft.Page):
                         ft.Row(
                             [
                                 *(
-                                    [ft.ElevatedButton(text="Discord 已驗證",icon=ft.Icons.VERIFIED, bgcolor=ft.Colors.BLUE, on_click=lambda e: page.open(ft.SnackBar(content=ft.Text("此機器人經過 Discord 官方驗證。"))))] if verified else []
+                                    [ft.ElevatedButton(text="Discord 已驗證", color=ft.Colors.WHITE, icon=ft.Icons.VERIFIED, icon_color=ft.Colors.WHITE, bgcolor=ft.Colors.BLUE, on_click=lambda e: page.open(ft.SnackBar(content=ft.Text("此機器人經過 Discord 官方驗證。"))))] if verified else []
                                 ),
                                 *(
-                                    [ft.ElevatedButton(text="DCTW 合作夥伴",icon=ft.Icons.STAR, bgcolor=ft.Colors.GREEN, on_click=lambda e: page.open(ft.SnackBar(content=ft.Text("此機器人為 DCTW 合作夥伴。"))))] if is_partner else []
+                                    [ft.ElevatedButton(text="DCTW 合作夥伴", color=ft.Colors.WHITE, icon=ft.Icons.STAR, icon_color=ft.Colors.WHITE, bgcolor=ft.Colors.GREEN, on_click=lambda e: page.open(ft.SnackBar(content=ft.Text("此機器人為 DCTW 合作夥伴。"))))] if is_partner else []
                                 )
                             ],
                             alignment=ft.MainAxisAlignment.CENTER,
@@ -347,7 +363,9 @@ def main(page: ft.Page):
                                     [
                                         ft.ElevatedButton(
                                             text="DCTW 合作夥伴",
+                                            color=ft.Colors.WHITE,
                                             icon=ft.Icons.STAR,
+                                            icon_color=ft.Colors.WHITE,
                                             bgcolor=ft.Colors.GREEN,
                                             on_click=lambda e: page.open(ft.SnackBar(content=ft.Text("此伺服器為 DCTW 合作夥伴。")))
                                         )
