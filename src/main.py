@@ -294,8 +294,6 @@ def main(page: ft.Page):
                             ),
                             alignment=ft.alignment.center,
                         ),
-                        # tags
-                        
                         ft.Container(
                             content=ft.Markdown(
                                 bot["introduce"],
@@ -303,6 +301,16 @@ def main(page: ft.Page):
                                 on_tap_link=lambda e: page.launch_url(e.data),
                             ),
                             padding=ft.padding.all(10),
+                        ),
+                        ft.Row(
+                            [
+                                ft.ElevatedButton(
+                                    text="DCTW 機器人頁面",
+                                    icon=ft.Icons.OPEN_IN_NEW,
+                                    on_click=lambda e: page.launch_url(f"https://dctw.xyz/bots/{bot['id']}"),
+                                )
+                            ],
+                            alignment=ft.MainAxisAlignment.CENTER,
                         )
                     ],
                     alignment=ft.MainAxisAlignment.START,
@@ -441,14 +449,21 @@ def main(page: ft.Page):
                                 on_tap_link=lambda e: page.launch_url(e.data),
                             ),
                             padding=ft.padding.all(10),
+                        ),
+                        ft.Row(
+                            [
+                                ft.ElevatedButton(
+                                    text="DCTW 伺服器頁面",
+                                    icon=ft.Icons.OPEN_IN_NEW,
+                                    on_click=lambda e: page.launch_url(f"https://dctw.xyz/servers/{server['id']}"),
+                                ),
+                            ],
+                            alignment=ft.MainAxisAlignment.CENTER,
                         )
                     ],
                     alignment=ft.MainAxisAlignment.START,
                     scroll=ft.ScrollMode.AUTO,
                 )
-            )
-            server_view.controls.append(
-                ft.Text("伺服器詳情頁面正在開發中...")
             )
             page.views.append(server_view)
             page.update()
@@ -513,12 +528,19 @@ def main(page: ft.Page):
                         ft.Markdown(
                             template["introduce"],
                             on_tap_link=lambda e: page.launch_url(e.data),
-                        )
+                        ),
+                        ft.Row(
+                            [
+                                ft.ElevatedButton(
+                                    text="DCTW 模板頁面",
+                                    icon=ft.Icons.OPEN_IN_NEW,
+                                    on_click=lambda e: page.launch_url(f"https://dctw.xyz/templates/{template['id']}"),
+                                ),
+                            ],
+                            alignment=ft.MainAxisAlignment.CENTER,
+                        ),
                     ]
                 )
-            )
-            template_view.controls.append(
-                ft.Text("伺服器模板詳情頁面正在開發中...")
             )
             page.views.append(template_view)
             page.update()
