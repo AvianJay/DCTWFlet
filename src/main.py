@@ -691,6 +691,19 @@ def main(page: ft.Page):
                                     value=config.config("nsfw"),
                                     on_change=lambda e: config.config("nsfw", e.control.value, "w"),
                                 ),
+                                # app update
+                                ft.Dropdown(
+                                    label="應用程式更新頻道",
+                                    options=[
+                                        ft.dropdown.Option("release", "正式版"),
+                                        ft.dropdown.Option("nightly", "開發版"),
+                                        *(
+                                            [ft.dropdown.Option("developer", "開發者版")] if config.update_channel == "developer" else [],
+                                        )
+                                    ],
+                                    value=config.config("update_channel"),
+                                    on_change=lambda e: config.config("update_channel", e.control.value, "w"),
+                                ),
                                 ft.Dropdown(
                                     label="應用程式更新通知",
                                     options=[
@@ -710,6 +723,7 @@ def main(page: ft.Page):
                                 ),
                                 # version info
                                 ft.Text(f"應用程式版本: {config.full_version}"),
+                                ft.Text(f"更新頻道: {config.update_channel}"),
                                 # clear cache button
                                 ft.ElevatedButton(
                                     text="清除所有快取",

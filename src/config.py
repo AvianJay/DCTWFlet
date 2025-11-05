@@ -18,7 +18,7 @@ app = Flask(__name__)
 port = random.randint(10000, 60000)
 
 app_version = "0.1.0"
-config_version = 6
+config_version = 7
 update_channel = "developer"
 hash = "unknown"
 if hash == "unknown":
@@ -46,6 +46,7 @@ default_config = {
     "sort_order_bots": "bumped",
     "sort_order_servers": "bumped",
     "sort_order_templates": "bumped",
+    "update_channel": update_channel,
 }
 
 config_path = os.path.join(datadir, "config.json")
@@ -421,7 +422,7 @@ threading.Thread(target=run_image_cache_server, daemon=True).start()
 # check updates
 def check_update():
     global app_version
-    if update_channel == "nightly":
+    if config("update_channel") == "nightly":
         workflows_url = "https://api.github.com/repos/" \
             "AvianJay/DCTWFlet/actions/workflows"
         res = requests.get(workflows_url).json()
@@ -445,9 +446,9 @@ def check_update():
                     f"workflows/build/main/DCTWFlet-{platform}.zip"
                 )
         return False, None
-    elif update_channel == "developer":
+    elif config("update_channel") == "developer":
         return False, None  # No updates for developer channel
-    elif update_channel == "release":
+    elif config("update_channel") == "release":
         headers = {
             "User-Agent": "DCTWFlet/" + app_version
         }
