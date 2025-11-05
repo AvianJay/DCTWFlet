@@ -57,12 +57,13 @@ def main(page: ft.Page):
     def update_bots(e, force=False):
         bots = config.get_bots(force=force)
         bots_column.content.controls.clear()
+        listview = ft.ListView(expand=True)
         for bot in bots:
             if not config.config("nsfw") and bot.get("nsfw", False):
                 continue
             verified = bot.get("verified", False)
             is_partner = bot.get("is_partnered", False)
-            bots_column.content.controls.append(
+            listview.controls.append(
                 ft.ListTile(
                     leading=ft.Container(
                         content=ft.Stack(
@@ -98,16 +99,18 @@ def main(page: ft.Page):
                     on_click=lambda e: page.go(f"/bot/{e.control.key}"),
                 )
             )
+        bots_column.content = listview
         page.update()
 
     def update_servers(e, force=False):
         servers = config.get_servers(force=force)
         servers_column.content.controls.clear()
+        listview = ft.ListView(expand=True)
         for server in servers:
             if not config.config("nsfw") and server.get("nsfw", False):
                 continue
             is_partner = server.get("is_partnered", False)
-            servers_column.content.controls.append(
+            listview.controls.append(
                 ft.ListTile(
                     leading=ft.CircleAvatar(foreground_image_src=config.cache_image(server["icon_url"], size=128)),
                     title=ft.Row(
@@ -124,15 +127,17 @@ def main(page: ft.Page):
                     on_click=lambda e: page.go(f"/server/{e.control.key}"),
                 )
             )
+        servers_column.content = listview
         page.update()
 
     def update_templates(e, force=False):
         templates = config.get_templates(force=force)
         templates_column.content.controls.clear()
+        listview = ft.ListView(expand=True)
         for template in templates:
             if not config.config("nsfw") and template.get("nsfw", False):
                 continue
-            templates_column.content.controls.append(
+            listview.controls.append(
                 ft.ListTile(
                     title=ft.Text(template["name"]),
                     subtitle=ft.Text(template["description"]),
@@ -140,6 +145,7 @@ def main(page: ft.Page):
                     on_click=lambda e: page.go(f"/template/{e.control.key}"),
                 )
             )
+        templates_column.content = listview
         page.update()
     
     def force_update(e):
