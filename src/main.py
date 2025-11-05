@@ -428,7 +428,8 @@ def main(page: ft.Page):
                                     ft.ElevatedButton(text=config.server_tags[tag][0], icon=config.server_tags[tag][1]) for tag in server.get("tags", [])
                                 ],
                                 alignment=ft.MainAxisAlignment.CENTER,
-                                vertical_alignment=ft.CrossAxisAlignment.START
+                                vertical_alignment=ft.CrossAxisAlignment.START,
+                                wrap=True
                             ),
                             alignment=ft.alignment.center,
                         ),
@@ -524,6 +525,16 @@ def main(page: ft.Page):
                                 ),
                             ],
                             alignment=ft.MainAxisAlignment.CENTER,
+                        ),
+                        ft.Container(
+                            content=ft.Row(
+                                [
+                                    ft.ElevatedButton(text=config.template_tags[tag][0], icon=config.template_tags[tag][1]) for tag in template.get("tags", [])
+                                ],
+                                wrap=True,
+                                alignment=ft.MainAxisAlignment.CENTER,
+                            ),
+                            alignment=ft.alignment.center,
                         ),
                         ft.Markdown(
                             template["introduce"],
