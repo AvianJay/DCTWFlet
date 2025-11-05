@@ -420,16 +420,14 @@ def main(page: ft.Page):
                                 )
                             ] if is_partner else []
                         ),
-                        ft.Row(
-                            [
-                                ft.Text(
-                                    server["description"],
-                                    size=16,
-                                    weight=ft.FontWeight.NORMAL,
-                                    text_align=ft.TextAlign.CENTER
-                                ),
-                            ],
-                            alignment=ft.MainAxisAlignment.CENTER,
+                        ft.Container(
+                            content=ft.Text(
+                                server["description"],
+                                size=16,
+                                weight=ft.FontWeight.NORMAL,
+                                text_align=ft.TextAlign.CENTER
+                            ),
+                            alignment=ft.alignment.center,
                         ),
                         # tags
                         ft.Container(
@@ -515,16 +513,14 @@ def main(page: ft.Page):
                             ],
                             alignment=ft.MainAxisAlignment.CENTER,
                         ),
-                        ft.Row(
-                            [
-                                ft.Text(
-                                    template["description"],
-                                    size=16,
-                                    weight=ft.FontWeight.NORMAL,
-                                    text_align=ft.TextAlign.CENTER
-                                ),
-                            ],
-                            alignment=ft.MainAxisAlignment.CENTER,
+                        ft.Container(
+                            content=ft.Text(
+                                template["description"],
+                                size=16,
+                                weight=ft.FontWeight.NORMAL,
+                                text_align=ft.TextAlign.CENTER
+                            ),
+                            alignment=ft.alignment.center,
                         ),
                         ft.Row(
                             [
