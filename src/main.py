@@ -1,6 +1,7 @@
 import flet as ft
 import config
 import threading
+import traceback
 
 
 def main(page: ft.Page):
@@ -873,6 +874,7 @@ def main(page: ft.Page):
                 ))
     except Exception as e:
         print("Failed to check app update:", str(e))
+        traceback.print_exc()
         page.open(ft.SnackBar(
             content=ft.Text("檢查程式更新時發生錯誤。"),
             action="確定",

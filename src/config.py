@@ -28,7 +28,7 @@ if hash == "unknown":
         print("Failed to get git hash:", str(e))
 full_version = f"{app_version}-{update_channel}({hash})"
 
-platform = os.getenv("FLET_PLATFORM")
+platform = os.getenv("FLET_PLATFORM", "windows")
 datadir = os.getenv("FLET_APP_STORAGE_DATA", ".")
 rel_datadir = os.path.relpath(datadir, os.getcwd())
 rel_datadir = rel_datadir.replace("\\", "/")  # for Windows compatibility
@@ -465,6 +465,7 @@ def check_update():
             for asset in releases[0]["assets"]:
                 if platform in asset["name"]:
                     file_url = asset["browser_download_url"]
+            file_url = file_url if "file_url" in locals() else None
             if latest_version != app_version:
                 return releases[0]["body"] + \
                     f"\n[original]({releases[0]['html_url']})", file_url
