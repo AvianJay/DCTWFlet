@@ -45,6 +45,7 @@ class TemplateListPage:
                 ft.dropdown.Option("bumped", "最近Bump"),
             ],
             value="newest",
+            width=150,
             on_change=lambda _: self.page.run_task(self._load_templates),
         )
 
@@ -71,6 +72,8 @@ class TemplateListPage:
                             self.sort_dropdown,
                         ],
                         spacing=10,
+                        wrap=False,
+                        run_spacing=10,
                     ),
                     padding=10,
                 ),

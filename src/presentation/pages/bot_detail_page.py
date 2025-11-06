@@ -1,4 +1,5 @@
 import flet as ft
+import re
 from typing import Optional
 from application.services import DiscoveryService
 from domain.discovery.entities import Bot
@@ -72,20 +73,42 @@ class BotDetailPage:
 
         return self.image_server.get_image_url(image_id)
 
+    def _convert_discord_emojis(self, text: str) -> str:
+        if not text:
+            return ""
+
+        # Replace animated emojis <a:name:id>
+        text = re.sub(
+            r"<a:\w*:(\d+)>",
+            r"![emoji](https://cdn.discordapp.com/emojis/\1.gif?size=32&quality=lossless)",
+            text,
+        )
+
+        # Replace static emojis <:name:id>
+        text = re.sub(
+            r"<:\w*:(\d+)>",
+            r"![emoji](https://cdn.discordapp.com/emojis/\1.png?size=32&quality=lossless)",
+            text,
+        )
+        return text
+
     def build(self) -> ft.Control:
         """Build page UI"""
-        # Create loading indicator first
 
-        self._content_container = ft.Container(expand=True)
+        # Create loading indicator first
+        self._content_container = ft.Container(
+            expand=True,
+            alignment=ft.alignment.center,
+        )
 
         # Create loading indicator
         self._content_container.content = ft.Column(
             [
                 ft.ProgressRing(),
-                ft.Text("載入中...", size=16),
+                ft.Text("載入中...", size=16, text_align=ft.TextAlign.CENTER),
             ],
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-            alignment=ft.MainAxisAlignment.CENTER,
+            spacing=10,
         )
 
         # Load bot data asynchronously
@@ -158,7 +181,7 @@ class BotDetailPage:
                 # Introduction (Markdown)
                 ft.Container(
                     content=ft.Markdown(
-                        bot.introduce,
+                        self._convert_discord_emojis(bot.introduce),
                         fit_content=False,
                         on_tap_link=lambda e: self.page.launch_url(e.data),
                     ),
@@ -200,6 +223,7 @@ class BotDetailPage:
             banner_content = ft.Image(
                 src=banner_url,
                 fit=ft.ImageFit.COVER,
+                width=float("inf"),
                 error_content=ft.Container(
                     bgcolor=ft.Colors.SURFACE,
                 ),
@@ -208,13 +232,14 @@ class BotDetailPage:
             banner_content = ft.Container(
                 bgcolor=ft.Colors.SURFACE,
             )
+
         return ft.Stack(
             [
                 # Banner
                 ft.Container(
                     content=banner_content,
                     height=256,
-                    width=self.page.width,
+                    expand=True,
                 ),
                 # Avatar with status indicator
                 ft.Container(
@@ -248,7 +273,6 @@ class BotDetailPage:
                     margin=ft.margin.only(top=128),
                 ),
             ],
-            width=self.page.width,
             height=256 + 64,
         )
 

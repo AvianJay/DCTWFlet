@@ -46,6 +46,7 @@ class BotListPage:
                 ft.dropdown.Option("bumped", "最近Bump"),
             ],
             value="newest",
+            width=150,
             on_change=lambda _: self.page.run_task(self._load_bots),
         )
         self.progress = ft.ProgressBar(visible=False)
@@ -71,11 +72,12 @@ class BotListPage:
                             self.sort_dropdown,
                         ],
                         spacing=10,
+                        wrap=False,
+                        run_spacing=10,
                     ),
                     padding=10,
                 ),
                 self.progress,
-                # Bot列表
                 ft.Container(self.bot_list, expand=True),
             ],
             expand=True,
@@ -107,7 +109,6 @@ class BotListPage:
             self._render_bot_list(bots)
 
         except Exception as e:
-            print(f"Error loading bots: {e}")
             self._show_error(f"載入失敗: {str(e)}")
 
         finally:
@@ -238,7 +239,7 @@ class BotListPage:
                         ),
                         ft.Row(
                             [
-                                ft.ElevatedButton(
+                                ft.OutlinedButton(
                                     "邀請",
                                     icon=ft.Icons.ADD,
                                     on_click=lambda _: self.page.launch_url(

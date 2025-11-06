@@ -16,23 +16,15 @@ class Settings:
     """Application Settings"""
 
     app_name: str = "DCTWFlet"
-
     app_version: str = "0.1.0"
-
+    hash: str = "dev"
     update_channel: str = "developer"
-
     data_dir: Path = None
-
     cache_dir: Path = None
-
     image_cache_dir: Path = None
-
     log_dir: Path = None
-
     api_base_url: str = "https://dctw.nyanko.host/api/v1"
-
     api_key: Optional[str] = None
-
     cache_ttl: int = 60
 
     image_server_port_range: tuple[int, int] = (10000, 60000)
@@ -98,27 +90,19 @@ class Settings:
         if config_file.exists():
 
             try:
-
                 with open(config_file, "r", encoding="utf-8") as f:
-
                     config_data = json.load(f)
-
                     # Load apikey from config (UserPreferences uses 'apikey')
 
                     api_key = config_data.get("apikey", "")
-
                     if api_key:
-
                         self.api_key = api_key
-
                         logger.info("API key loaded from config.json")
 
                     else:
-
                         logger.warning("No API key found in config.json")
 
             except Exception as e:
-
                 logger.error(f"Failed to load API key from config: {e}")
 
 

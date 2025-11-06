@@ -27,10 +27,10 @@ jobs:
       - name: Get short Git commit hash
         run: echo "COMMIT_HASH=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
-      - name: Replace hash and update channel in config.py
+      - name: Replace hash and update channel in settings.py
         run: |
-          sed -i 's/hash = ".*"/hash = "'$COMMIT_HASH'"/' src/config.py
-          sed -i 's/update_channel = ".*"/update_channel = "nightly"/' src/config.py
+          sed -i 's/hash: str = ".*"/hash: str = "'$COMMIT_HASH'"/' src/infrastructure/config/settings.py
+          sed -i 's/update_channel: str = ".*"/update_channel: str = "nightly"/' src/infrastructure/config/settings.py
 
       - name: Set up Python 3.x
         uses: actions/setup-python@v2
@@ -71,10 +71,10 @@ jobs:
       - name: Get short Git commit hash
         run: echo "COMMIT_HASH=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
-      - name: Replace hash and update channel in config.py
+      - name: Replace hash and update channel in settings.py
         run: |
-          sed -i 's/hash = ".*"/hash = "'$COMMIT_HASH'"/' src/config.py
-          sed -i 's/update_channel = ".*"/update_channel = "nightly"/' src/config.py
+          sed -i 's/hash: str = ".*"/hash: str = "'$COMMIT_HASH'"/' src/infrastructure/config/settings.py
+          sed -i 's/update_channel: str = ".*"/update_channel: str = "nightly"/' src/infrastructure/config/settings.py
 
       - name: Set up Python 3.x
         uses: actions/setup-python@v2
@@ -115,10 +115,10 @@ jobs:
       - name: Get short Git commit hash
         run: echo "COMMIT_HASH=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
-      - name: Replace hash and update channel in config.py
+      - name: Replace hash and update channel in settings.py
         run: |
-          sed -i '' 's/hash = ".*"/hash = "'$COMMIT_HASH'"/' src/config.py
-          sed -i '' 's/update_channel = ".*"/update_channel = "nightly"/' src/config.py
+          sed -i '' 's/hash: str = ".*"/hash: str = "'$COMMIT_HASH'"/' src/infrastructure/config/settings.py
+          sed -i '' 's/update_channel: str = ".*"/update_channel: str = "nightly"/' src/infrastructure/config/settings.py
 
       - name: Set up Python 3.x
         uses: actions/setup-python@v2
@@ -173,10 +173,10 @@ jobs:
       - name: Get short Git commit hash
         run: echo "COMMIT_HASH=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
-      - name: Replace hash and update channel in config.py
+      - name: Replace hash and update channel in settings.py
         run: |
-          sed -i '' 's/hash = ".*"/hash = "'$COMMIT_HASH'"/' src/config.py
-          sed -i '' 's/update_channel = ".*"/update_channel = "nightly"/' src/config.py
+          sed -i '' 's/hash: str = ".*"/hash: str = "'$COMMIT_HASH'"/' src/infrastructure/config/settings.py
+          sed -i '' 's/update_channel: str = ".*"/update_channel: str = "nightly"/' src/infrastructure/config/settings.py
 
       - name: Set up Python 3.x
         uses: actions/setup-python@v2
@@ -198,7 +198,7 @@ jobs:
         with:
           name: DCTWFlet-macos
           path: build/macos
-      
+
   build-windows:
     runs-on: windows-latest
     steps:
@@ -213,11 +213,11 @@ jobs:
       - name: Get short Git commit hash
         run: echo "COMMIT_HASH=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
-      - name: Replace hash and update channel in config.py
+      - name: Replace hash and update channel in settings.py
         shell: bash
         run: |
-          sed -i 's/hash = ".*"/hash = "'$COMMIT_HASH'"/' src/config.py
-          sed -i 's/update_channel = ".*"/update_channel = "nightly"/' src/config.py
+          sed -i 's/hash: str = ".*"/hash: str = "'$COMMIT_HASH'"/' src/infrastructure/config/settings.py
+          sed -i 's/update_channel: str = ".*"/update_channel: str = "nightly"/' src/infrastructure/config/settings.py
 
       - name: Install dependencies
         run: |
@@ -245,15 +245,15 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: '3.x'
-      
+
       - name: Get short Git commit hash
         run: echo "COMMIT_HASH=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
-      - name: Replace hash and update channel in config.py
+      - name: Replace hash and update channel in settings.py
         run: |
-          sed -i 's/hash = ".*"/hash = "'$COMMIT_HASH'"/' src/config.py
-          sed -i 's/update_channel = ".*"/update_channel = "nightly"/' src/config.py
-      
+          sed -i 's/hash: str = ".*"/hash: str = "'$COMMIT_HASH'"/' src/infrastructure/config/settings.py
+          sed -i 's/update_channel: str = ".*"/update_channel: str = "nightly"/' src/infrastructure/config/settings.py
+
       - name: Patch for linux build
         run: |
           sudo apt-get update -y
@@ -285,14 +285,14 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: '3.x'
-      
+
       - name: Get short Git commit hash
         run: echo "COMMIT_HASH=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
-      - name: Replace hash and update channel in config.py
+      - name: Replace hash and update channel in settings.py
         run: |
-          sed -i 's/hash = ".*"/hash = "'$COMMIT_HASH'"/' src/config.py
-          sed -i 's/update_channel = ".*"/update_channel = "nightly"/' src/config.py
+          sed -i 's/hash: str = ".*"/hash: str = "'$COMMIT_HASH'"/' src/infrastructure/config/settings.py
+          sed -i 's/update_channel: str = ".*"/update_channel: str = "nightly"/' src/infrastructure/config/settings.py
 
       - name: Install dependencies
         run: |

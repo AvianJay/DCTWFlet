@@ -84,7 +84,7 @@ class SettingsPage:
                             ft.Text("API設置", size=18, weight=ft.FontWeight.BOLD),
                             ft.Divider(),
                             self.api_key_field,
-                            ft.ElevatedButton(
+                            ft.OutlinedButton(
                                 "Save API key",
                                 icon=ft.Icons.SAVE,
                                 on_click=lambda _: self.page.run_task(
@@ -100,7 +100,7 @@ class SettingsPage:
                             # Cache management
                             ft.Text("緩存", size=18, weight=ft.FontWeight.BOLD),
                             ft.Divider(),
-                            ft.ElevatedButton(
+                            ft.OutlinedButton(
                                 "清除所有緩存",
                                 icon=ft.Icons.DELETE_SWEEP,
                                 on_click=lambda _: self.page.run_task(
@@ -110,7 +110,7 @@ class SettingsPage:
                         ],
                         scroll=ft.ScrollMode.AUTO,
                     ),
-                    padding=20,
+                    padding=ft.padding.only(left=20, right=20, top=20, bottom=10),
                     expand=True,
                 ),
             ],

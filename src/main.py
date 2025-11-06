@@ -36,6 +36,18 @@ async def main(page: ft.Page):
     page.theme_mode = ft.ThemeMode.SYSTEM
     page.padding = 0
 
+    # Configure theme with consistent NavigationBar height across light and dark modes
+    page.theme = ft.Theme(
+        navigation_bar_theme=ft.NavigationBarTheme(
+            height=80,
+        )
+    )
+    page.dark_theme = ft.Theme(
+        navigation_bar_theme=ft.NavigationBarTheme(
+            height=80,
+        )
+    )
+
     # Start ImageServer in background
     container = get_container()
     image_server: ImageServer = container.resolve(ImageServer)
