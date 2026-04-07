@@ -58,12 +58,16 @@ class TemplateListPage:
 
         return ft.Column(
             [
-                ft.Container(
-                    content=ft.Text(
-                        "Discord 模板清單", size=24, weight=ft.FontWeight.BOLD
-                    ),
-                    bgcolor=ft.Colors.SURFACE,
-                    padding=15,
+                # ft.Container(
+                #     content=ft.Text(
+                #         "Discord 模板清單", size=24, weight=ft.FontWeight.BOLD
+                #     ),
+                #     bgcolor=ft.Colors.SURFACE,
+                #     padding=15,
+                # ),
+                ft.AppBar(
+                    title=ft.Text("DCTW 模板清單"),
+                    bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST,
                 ),
                 ft.Container(
                     content=ft.Row(

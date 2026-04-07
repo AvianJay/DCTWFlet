@@ -2,6 +2,7 @@
 
 from typing import List, Dict, Any, Optional, Tuple
 import logging
+import httpx
 
 from domain.preferences.value_objects import ApiKey
 from infrastructure.filesystem import ConfigStorage
@@ -23,7 +24,7 @@ class DctwApiClient:
     DEFAULT_AUTH_BASE_URL = DCTW_API_AUTH_BASE_URL
     DEFAULT_API_PREFIX = DCTW_API_VERSION_PREFIX
     DEFAULT_OPENAPI_URL = DCTW_API_OPENAPI_URL
-    PAGE_LIMIT = 50
+    DEFAULT_PAGE_LIMIT = 50
 
     def __init__(
         self,
@@ -46,6 +47,8 @@ class DctwApiClient:
         self._openapi_url = openapi_url or self.DEFAULT_OPENAPI_URL
         self._user_agent = user_agent
         self._config_storage = config_storage
+        self._openapi_schema: Optional[Dict[str, Any]] = None
+        self._page_limit_cache: Dict[str, int] = {}
 
     @property
     def openapi_url(self) -> str:
@@ -101,12 +104,13 @@ class DctwApiClient:
     async def _get_paginated_collection(self, endpoint: str) -> List[Dict[str, Any]]:
         base_url, headers, is_authenticated = await self._resolve_request_config()
         resolved_endpoint = self._resolve_endpoint(endpoint, is_authenticated)
+        page_limit = await self._get_page_limit(endpoint)
         items: List[Dict[str, Any]] = []
         cursor: Optional[str] = None
 
         async with AsyncHttpClient(base_url, headers=headers) as client:
             while True:
-                params: Dict[str, Any] = {"limit": self.PAGE_LIMIT}
+                params: Dict[str, Any] = {"limit": page_limit}
                 if cursor:
                     params["cursor"] = cursor
 
@@ -153,6 +157,59 @@ class DctwApiClient:
                 logger.warning(f"Failed to load API key from config storage: {e}")
 
         return self._default_api_key
+
+    async def _get_page_limit(self, endpoint: str) -> int:
+        cache_key = self._normalize_path_prefix(endpoint)
+        if cache_key in self._page_limit_cache:
+            return self._page_limit_cache[cache_key]
+
+        page_limit = self.DEFAULT_PAGE_LIMIT
+
+        try:
+            schema = await self._get_openapi_schema()
+            schema_path = f"{self._api_prefix}{cache_key}"
+            parameters = schema.get("paths", {}).get(schema_path, {}).get("get", {}).get(
+                "parameters",
+                [],
+            )
+
+            for parameter in parameters:
+                if parameter.get("name") != "limit":
+                    continue
+
+                parameter_schema = parameter.get("schema", {})
+                page_limit = int(
+                    parameter_schema.get(
+                        "maximum",
+                        parameter_schema.get("default", self.DEFAULT_PAGE_LIMIT),
+                    )
+                )
+                break
+        except Exception as e:
+            logger.warning(
+                f"Failed to load page limit from OpenAPI for {endpoint}: {e}"
+            )
+
+        self._page_limit_cache[cache_key] = page_limit
+        logger.info(
+            f"Resolved page limit for {cache_key or '/'} from OpenAPI: {page_limit}"
+        )
+        return page_limit
+
+    async def _get_openapi_schema(self) -> Dict[str, Any]:
+        if self._openapi_schema is not None:
+            return self._openapi_schema
+
+        async with httpx.AsyncClient(
+            headers={"User-Agent": self._user_agent},
+            timeout=30.0,
+            follow_redirects=True,
+        ) as client:
+            response = await client.get(self._openapi_url)
+            response.raise_for_status()
+            self._openapi_schema = response.json()
+
+        return self._openapi_schema
 
     def _resolve_endpoint(self, endpoint: str, is_authenticated: bool) -> str:
         normalized_endpoint = self._normalize_path_prefix(endpoint)

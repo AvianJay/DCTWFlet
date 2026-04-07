@@ -29,7 +29,7 @@ class DctwTemplateRepository(TemplateRepository):
     async def find_all(self) -> List[Template]:
         """Get allTemplates"""
         cached = await self._cache.get(self.CACHE_KEY)
-        if cached:
+        if cached is not None:
             logger.info(f"Loading {len(cached)} templates from cache")
             return [self._deserialize_template(data) for data in cached]
 

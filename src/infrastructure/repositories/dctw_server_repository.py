@@ -32,7 +32,7 @@ class DctwServerRepository(ServerRepository):
     async def find_all(self) -> List[Server]:
         """Get allServers"""
         cached = await self._cache.get(self.CACHE_KEY)
-        if cached:
+        if cached is not None:
             logger.info(f"Loading {len(cached)} servers from cache")
             return [self._deserialize_server(data) for data in cached]
 

@@ -10,7 +10,7 @@ from domain.discovery.repositories import (
 from domain.preferences.repositories import PreferencesRepository
 from ..config import get_settings
 from ..api import DctwApiClient
-from ..cache import CacheManager, MemoryCacheManager
+from ..cache import CacheManager, JsonCacheManager
 from ..filesystem import ConfigStorage
 from ..image import ImageServer
 from ..repositories import (
@@ -90,7 +90,7 @@ def setup_container() -> DiContainer:
 
     container.register(
         CacheManager,
-        lambda c: MemoryCacheManager(),
+        lambda c: JsonCacheManager(settings.cache_file),
         singleton=True,
     )
 
@@ -120,7 +120,7 @@ def setup_container() -> DiContainer:
             user_agent=f"{settings.app_name}/{settings.app_version}",
             config_storage=c.resolve(ConfigStorage),
         ),
-        singleton=False,
+        singleton=True,
     )
 
     container.register(

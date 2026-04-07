@@ -33,7 +33,7 @@ class DctwBotRepository(BotRepository):
     async def find_all(self) -> List[Bot]:
         """Get allBots"""
         cached = await self._cache.get(self.CACHE_KEY)
-        if cached:
+        if cached is not None:
             logger.info(f"Loading {len(cached)} bots from cache")
             return [self._deserialize_bot(data) for data in cached]
 
