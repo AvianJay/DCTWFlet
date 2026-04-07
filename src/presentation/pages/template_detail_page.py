@@ -1,4 +1,5 @@
 
+import asyncio
 import flet as ft
 from typing import Optional
 from application.services import DiscoveryService
@@ -29,7 +30,7 @@ class TemplateDetailPage:
         """Build page UI"""
         self._content_container = ft.Container(
             expand=True,
-            alignment=ft.alignment.center,
+            alignment=ft.Alignment(0, 0),
         )
 
         self._content_container.content = ft.Column(
@@ -91,7 +92,7 @@ class TemplateDetailPage:
                         text_align=ft.TextAlign.CENTER,
                         no_wrap=False,
                     ),
-                    alignment=ft.alignment.center,
+                    alignment=ft.Alignment(0, 0),
                     padding=ft.padding.symmetric(horizontal=20),
                 ),
                 # Action buttons
@@ -100,13 +101,13 @@ class TemplateDetailPage:
                         [
                             ft.ElevatedButton(
                                 icon=ft.Icons.ADD,
-                                text="使用模板",
+                                content=ft.Text("使用模板"),
                                 on_click=lambda e: self.page.launch_url(template.links.share_url.value),
                             ),
                         ],
                         alignment=ft.MainAxisAlignment.CENTER,
                     ),
-                    alignment=ft.alignment.center,
+                    alignment=ft.Alignment(0, 0),
                     padding=ft.padding.symmetric(vertical=20),
                 ),
                 # Tags
@@ -124,7 +125,7 @@ class TemplateDetailPage:
                 ft.Row(
                     [
                         ft.ElevatedButton(
-                            text="DCTW 模板頁面",
+                            content=ft.Text("DCTW 模板頁面"),
                             icon=ft.Icons.OPEN_IN_NEW,
                             on_click=lambda e: self.page.launch_url(
                                 f"https://dctw.xyz/templates/{template.id}"
@@ -147,7 +148,7 @@ class TemplateDetailPage:
         tag_buttons = []
         for tag in template.tags:
             display_name, icon = self._get_tag_info(tag.name)
-            tag_buttons.append(ft.ElevatedButton(text=display_name, icon=icon))
+            tag_buttons.append(ft.ElevatedButton(content=ft.Text(display_name), icon=icon))
 
         if not tag_buttons:
             return ft.Container(height=0)
@@ -159,7 +160,7 @@ class TemplateDetailPage:
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 wrap=True,
             ),
-            alignment=ft.alignment.center,
+            alignment=ft.Alignment(0, 0),
             padding=ft.padding.symmetric(horizontal=20),
         )
 
@@ -171,16 +172,16 @@ class TemplateDetailPage:
                     ft.Icon(ft.Icons.ERROR_OUTLINE, size=64, color=ft.Colors.ERROR),
                     ft.Text(message, size=18, text_align=ft.TextAlign.CENTER),
                     ft.ElevatedButton(
-                        text="返回",
+                        content=ft.Text("返回"),
                         icon=ft.Icons.ARROW_BACK,
-                        on_click=lambda e: self.page.go("/"),
+                        on_click=lambda e: asyncio.create_task(self.page.push_route("/")),
                     ),
                 ],
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 alignment=ft.MainAxisAlignment.CENTER,
                 spacing=20,
             ),
-            alignment=ft.alignment.center,
+            alignment=ft.Alignment(0, 0),
             expand=True,
             padding=ft.padding.all(40),
         )

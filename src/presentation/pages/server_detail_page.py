@@ -1,4 +1,5 @@
 
+import asyncio
 import flet as ft
 import re
 from typing import Optional
@@ -58,7 +59,7 @@ class ServerDetailPage:
         """Build page UI"""
         self._content_container = ft.Container(
             expand=True,
-            alignment=ft.alignment.center,
+            alignment=ft.Alignment(0, 0),
         )
 
         self._content_container.content = ft.Column(
@@ -123,7 +124,7 @@ class ServerDetailPage:
                         text_align=ft.TextAlign.CENTER,
                         no_wrap=False,
                     ),
-                    alignment=ft.alignment.center,
+                    alignment=ft.Alignment(0, 0),
                     padding=ft.padding.symmetric(horizontal=20),
                 ),
                 # Tags
@@ -143,7 +144,7 @@ class ServerDetailPage:
                 ft.Row(
                     [
                         ft.ElevatedButton(
-                            text="DCTW 伺服器頁面",
+                            content=ft.Text("DCTW 伺服器頁面"),
                             icon=ft.Icons.OPEN_IN_NEW,
                             on_click=lambda e: self.page.launch_url(
                                 f"https://dctw.xyz/servers/{server.id}"
@@ -188,7 +189,7 @@ class ServerDetailPage:
                         foreground_image_src=icon_url,
                         radius=64,
                     ),
-                    alignment=ft.alignment.bottom_center,
+                    alignment=ft.Alignment(0, 1),
                     margin=ft.margin.only(top=128),
                 ),
             ],
@@ -203,7 +204,7 @@ class ServerDetailPage:
         return ft.Row(
             [
                 ft.ElevatedButton(
-                    text="DCTW 合作夥伴",
+                    content=ft.Text("DCTW 合作夥伴"),
                     color=ft.Colors.WHITE,
                     icon=ft.Icons.STAR,
                     icon_color=ft.Colors.WHITE,
@@ -222,7 +223,7 @@ class ServerDetailPage:
         tag_buttons = []
         for tag in server.tags:
             display_name, icon = self._get_tag_info(tag.name)
-            tag_buttons.append(ft.ElevatedButton(text=display_name, icon=icon))
+            tag_buttons.append(ft.ElevatedButton(content=ft.Text(display_name), icon=icon))
 
         if not tag_buttons:
             return ft.Container(height=0)
@@ -234,7 +235,7 @@ class ServerDetailPage:
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 wrap=True,
             ),
-            alignment=ft.alignment.center,
+            alignment=ft.Alignment(0, 0),
             padding=ft.padding.symmetric(horizontal=20),
         )
 
@@ -245,14 +246,14 @@ class ServerDetailPage:
                 [
                     ft.ElevatedButton(
                         icon=ft.Icons.ADD,
-                        text="加入伺服器",
+                        content=ft.Text("加入伺服器"),
                         on_click=lambda e: self.page.launch_url(server.links.invite.value),
                     ),
                 ],
                 alignment=ft.MainAxisAlignment.CENTER,
                 wrap=True,
             ),
-            alignment=ft.alignment.center,
+            alignment=ft.Alignment(0, 0),
             padding=ft.padding.symmetric(horizontal=20),
         )
 
@@ -264,16 +265,16 @@ class ServerDetailPage:
                     ft.Icon(ft.Icons.ERROR_OUTLINE, size=64, color=ft.Colors.ERROR),
                     ft.Text(message, size=18, text_align=ft.TextAlign.CENTER),
                     ft.ElevatedButton(
-                        text="返回",
+                        content=ft.Text("返回"),
                         icon=ft.Icons.ARROW_BACK,
-                        on_click=lambda e: self.page.go("/"),
+                        on_click=lambda e: asyncio.create_task(self.page.push_route("/")),
                     ),
                 ],
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 alignment=ft.MainAxisAlignment.CENTER,
                 spacing=20,
             ),
-            alignment=ft.alignment.center,
+            alignment=ft.Alignment(0, 0),
             expand=True,
             padding=ft.padding.all(40),
         )

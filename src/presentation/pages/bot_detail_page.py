@@ -1,5 +1,6 @@
 import flet as ft
 import re
+import asyncio
 from typing import Optional
 from application.services import DiscoveryService
 from domain.discovery.entities import Bot
@@ -86,7 +87,7 @@ class BotDetailPage:
         # Create loading indicator first
         self._content_container = ft.Container(
             expand=True,
-            alignment=ft.alignment.center,
+            alignment=ft.Alignment(0, 0),
         )
 
         # Create loading indicator
@@ -159,7 +160,7 @@ class BotDetailPage:
                         text_align=ft.TextAlign.CENTER,
                         no_wrap=False,
                     ),
-                    alignment=ft.alignment.center,
+                    alignment=ft.Alignment(0, 0),
                     padding=ft.padding.symmetric(horizontal=20),
                 ),
                 # Tags
@@ -181,7 +182,7 @@ class BotDetailPage:
                 ft.Row(
                     [
                         ft.ElevatedButton(
-                            text="DCTW 機器人頁面",
+                            content=ft.Text("DCTW 機器人頁面"),
                             icon=ft.Icons.OPEN_IN_NEW,
                             on_click=lambda e: self.page.launch_url(
                                 f"https://dctw.xyz/bots/{bot.id}"
@@ -210,7 +211,7 @@ class BotDetailPage:
         if banner_url:
             banner_content = ft.Image(
                 src=banner_url,
-                fit=ft.ImageFit.COVER,
+                fit=ft.BoxFit.COVER,
                 width=float("inf"),
                 error_content=ft.Container(
                     bgcolor=ft.Colors.SURFACE,
@@ -251,13 +252,13 @@ class BotDetailPage:
                                         )
                                     ),
                                 ),
-                                alignment=ft.alignment.bottom_right,
+                                alignment=ft.Alignment(1, 1),
                             ),
                         ],
                         width=128,
                         height=128,
                     ),
-                    alignment=ft.alignment.bottom_center,
+                    alignment=ft.Alignment(0, 1),
                     margin=ft.margin.only(top=128),
                 ),
             ],
@@ -272,7 +273,7 @@ class BotDetailPage:
         if bot.verified:
             badges.append(
                 ft.ElevatedButton(
-                    text="Discord 已驗證",
+                    content="Discord 已驗證",
                     color=ft.Colors.WHITE,
                     icon=ft.Icons.VERIFIED,
                     icon_color=ft.Colors.WHITE,
@@ -286,7 +287,7 @@ class BotDetailPage:
         if bot.is_partnered:
             badges.append(
                 ft.ElevatedButton(
-                    text="DCTW 合作夥伴",
+                    content="DCTW 合作夥伴",
                     color=ft.Colors.WHITE,
                     icon=ft.Icons.STAR,
                     icon_color=ft.Colors.WHITE,
@@ -314,7 +315,7 @@ class BotDetailPage:
         for tag in bot.tags:
             display_name, icon = self._get_tag_info(tag.name)
 
-            tag_buttons.append(ft.ElevatedButton(text=display_name, icon=icon))
+            tag_buttons.append(ft.ElevatedButton(content=ft.Text(display_name), icon=icon))
 
         if not tag_buttons:
             return ft.Container(height=0)
@@ -326,7 +327,7 @@ class BotDetailPage:
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 wrap=True,
             ),
-            alignment=ft.alignment.center,
+            alignment=ft.Alignment(0, 0),
             padding=ft.padding.symmetric(horizontal=20),
         )
 
@@ -335,7 +336,7 @@ class BotDetailPage:
         buttons = [
             ft.ElevatedButton(
                 icon=ft.Icons.PERSON_ADD,
-                text="邀請機器人",
+                content=ft.Text("邀請機器人"),
                 on_click=lambda e: self.page.launch_url(bot.links.invite.value),
             ),
         ]
@@ -344,7 +345,7 @@ class BotDetailPage:
             buttons.append(
                 ft.ElevatedButton(
                     icon=ft.Icons.HELP_CENTER,
-                    text="支援伺服器",
+                    content=ft.Text("支援伺服器"),
                     on_click=lambda e: self.page.launch_url(bot.links.support_server),
                 )
             )
@@ -353,7 +354,7 @@ class BotDetailPage:
             buttons.append(
                 ft.ElevatedButton(
                     icon=ft.Icons.LINK,
-                    text="官方網站",
+                    content=ft.Text("官方網站"),
                     on_click=lambda e: self.page.launch_url(bot.links.website),
                 )
             )
@@ -364,7 +365,7 @@ class BotDetailPage:
                 alignment=ft.MainAxisAlignment.CENTER,
                 wrap=True,
             ),
-            alignment=ft.alignment.center,
+            alignment=ft.Alignment(0, 0),
             padding=ft.padding.symmetric(horizontal=20),
         )
 
@@ -414,16 +415,16 @@ class BotDetailPage:
                     ft.Icon(ft.Icons.ERROR_OUTLINE, size=64, color=ft.Colors.ERROR),
                     ft.Text(message, size=18, text_align=ft.TextAlign.CENTER),
                     ft.ElevatedButton(
-                        text="返回",
+                        content="返回",
                         icon=ft.Icons.ARROW_BACK,
-                        on_click=lambda e: self.page.go("/"),
+                        on_click=lambda e: asyncio.create_task(self.page.push_route("/")),
                     ),
                 ],
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 alignment=ft.MainAxisAlignment.CENTER,
                 spacing=20,
             ),
-            alignment=ft.alignment.center,
+            alignment=ft.Alignment(0, 0),
             expand=True,
             padding=ft.padding.all(40),
         )

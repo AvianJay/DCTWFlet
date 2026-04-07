@@ -4,7 +4,6 @@ Display list with filtering and sorting support
 """
 
 import flet as ft
-import asyncio
 from typing import Optional
 
 from application.services import DiscoveryService, PreferenceService
@@ -47,7 +46,7 @@ class TemplateListPage:
             ],
             value="bumped",
             width=150,
-            on_change=lambda _: self.page.run_task(self._load_templates),
+            on_select=lambda _: self.page.run_task(self._load_templates),
         )
 
         self.progress = ft.ProgressBar(visible=False)
@@ -124,7 +123,7 @@ class TemplateListPage:
             self.template_list.controls.append(
                 ft.Container(
                     content=ft.Text("找不到模板 :(", size=16, color=ft.Colors.GREY),
-                    alignment=ft.alignment.center,
+                    alignment=ft.Alignment(0, 0),
                     padding=50,
                 )
             )
@@ -216,9 +215,7 @@ class TemplateListPage:
                                 ),
                                 ft.OutlinedButton(
                                     "詳情",
-                                    on_click=lambda _, t=template: self.page.go(
-                                        f"/template/{t.id}"
-                                    ),
+                                    on_click=lambda _, t=template: self._show_template_detail(t),
                                 ),
                             ],
                             spacing=10,
@@ -232,6 +229,14 @@ class TemplateListPage:
 
     def _show_template_detail(self, template: Template):
         """Show details"""
+        self.page.run_task(self._navigate_to_template_detail, template)
+
+    async def _navigate_to_template_detail(self, template: Template):
+        """Navigate to template detail page"""
+        await self.page.push_route(f"/template/{template.id}")
+
+    def _show_template_dialog(self, template: Template):
+        """Show details dialog"""
         dialog = ft.AlertDialog(
             title=ft.Text(template.name),
             content=ft.Column(

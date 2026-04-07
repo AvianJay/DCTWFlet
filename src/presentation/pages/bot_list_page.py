@@ -47,7 +47,7 @@ class BotListPage:
             ],
             value="bumped",
             width=150,
-            on_change=lambda _: self.page.run_task(self._load_bots),
+            on_select=lambda _: self.page.run_task(self._load_bots),
         )
         self.progress = ft.ProgressBar(visible=False)
 
@@ -123,7 +123,7 @@ class BotListPage:
             self.bot_list.controls.append(
                 ft.Container(
                     content=ft.Text("找不到機器人 :(", size=16, color=ft.Colors.GREY),
-                    alignment=ft.alignment.center,
+                    alignment=ft.Alignment(0, 0),
                     padding=50,
                 )
             )
@@ -257,7 +257,7 @@ class BotListPage:
                                 ),
                                 ft.OutlinedButton(
                                     "詳情",
-                                    on_click=lambda _, b=bot: self._show_bot_detail(b),
+                                    on_click=lambda _, b=bot: asyncio.create_task(self._show_bot_detail(b)),
                                 ),
                             ],
                             spacing=10,
@@ -269,9 +269,9 @@ class BotListPage:
             ),
         )
 
-    def _show_bot_detail(self, bot: Bot):
+    async def _show_bot_detail(self, bot: Bot):
         """Show details"""
-        self.page.go(f"/bot/{bot.id}")
+        await self.page.push_route(f"/bot/{bot.id}")
 
     async def _on_search(self):
         """Search event handler"""

@@ -8,7 +8,7 @@ authors = [
     { name = "AvianJay", email = "avianjay@avianjay.sbs" }
 ]
 dependencies = [
-    "flet==0.28.3",
+    "flet==0.84.0",
     "requests~=2.32.5",
     "flask~=3.1.2",
     "aiofiles~=25.1.0",
@@ -36,7 +36,7 @@ path = "src"
 
 [tool.uv]
 dev-dependencies = [
-    "flet[all]==0.28.3",
+    "flet[all]==0.84.0",
     "requests~=2.32.5",
     "flask~=3.1.2",
     "aiofiles~=25.1.0",
@@ -48,4 +48,4 @@ dev-dependencies = [
 package-mode = false
 
 [tool.poetry.group.dev.dependencies]
-flet = {extras = ["all"], version = "0.28.3"}
+flet = {extras = ["all"], version = "0.84.0"}

@@ -29,7 +29,7 @@ class SettingsPage:
                 ft.dropdown.Option("light", "淺色"),
                 ft.dropdown.Option("dark", "深色"),
             ],
-            on_change=lambda e: self.page.run_task(self._on_theme_changed, e),
+            on_select=lambda e: self.page.run_task(self._on_theme_changed, e),
         )
 
         self.nsfw_switch = ft.Switch(
@@ -50,7 +50,7 @@ class SettingsPage:
                 ft.dropdown.Option("notify", "通知欄提示"),
                 ft.dropdown.Option("none", "不檢查"),
             ],
-            on_change=lambda e: self.page.run_task(self._on_update_check_changed, e),
+            on_select=lambda e: self.page.run_task(self._on_update_check_changed, e),
         )
 
     def build(self) -> ft.Control:

@@ -4,7 +4,6 @@ Display list with filtering and sorting support
 """
 
 import flet as ft
-import asyncio
 from typing import Optional
 
 from application.services import DiscoveryService, PreferenceService
@@ -48,7 +47,7 @@ class ServerListPage:
             ],
             value="bumped",
             width=150,
-            on_change=lambda _: self.page.run_task(self._load_servers),
+            on_select=lambda _: self.page.run_task(self._load_servers),
         )
 
         self.progress = ft.ProgressBar(visible=False)
@@ -124,7 +123,7 @@ class ServerListPage:
             self.server_list.controls.append(
                 ft.Container(
                     content=ft.Text("找不到伺服器 :(", size=16, color=ft.Colors.GREY),
-                    alignment=ft.alignment.center,
+                    alignment=ft.Alignment(0, 0),
                     padding=50,
                 )
             )
@@ -229,9 +228,7 @@ class ServerListPage:
                                 ),
                                 ft.OutlinedButton(
                                     "詳情",
-                                    on_click=lambda _, s=server: self.page.go(
-                                        f"/server/{s.id}"
-                                    ),
+                                    on_click=lambda _, s=server: self._show_server_detail(s),
                                 ),
                             ],
                             spacing=10,
@@ -245,6 +242,14 @@ class ServerListPage:
 
     def _show_server_detail(self, server: Server):
         """Show details"""
+        self.page.run_task(self._navigate_to_server_detail, server)
+
+    async def _navigate_to_server_detail(self, server: Server):
+        """Navigate to server detail page"""
+        await self.page.push_route(f"/server/{server.id}")
+
+    def _show_server_dialog(self, server: Server):
+        """Show details dialog"""
         dialog = ft.AlertDialog(
             title=ft.Text(server.name),
             content=ft.Column(
