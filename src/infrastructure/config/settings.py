@@ -7,6 +7,16 @@ import platform
 import os
 import json
 import logging
+from domain.preferences.value_objects import ApiKey
+from .constants import (
+    APP_NAME,
+    APP_VERSION,
+    CACHE_TTL,
+    DCTW_API_AUTH_BASE_URL,
+    DCTW_API_BASE_URL,
+    DCTW_API_OPENAPI_URL,
+    DCTW_API_VERSION_PREFIX,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -15,17 +25,20 @@ logger = logging.getLogger(__name__)
 class Settings:
     """Application Settings"""
 
-    app_name: str = "DCTWFlet"
-    app_version: str = "0.1.2"
+    app_name: str = APP_NAME
+    app_version: str = APP_VERSION
     hash: str = "unknown"
     update_channel: str = "developer"
     data_dir: Path = None
     cache_dir: Path = None
     image_cache_dir: Path = None
     log_dir: Path = None
-    api_base_url: str = "https://dctw.nyanko.host/api/v1"
+    api_base_url: str = DCTW_API_BASE_URL
+    api_authenticated_base_url: str = DCTW_API_AUTH_BASE_URL
+    api_version_prefix: str = DCTW_API_VERSION_PREFIX
+    api_openapi_url: str = DCTW_API_OPENAPI_URL
     api_key: Optional[str] = None
-    cache_ttl: int = 60
+    cache_ttl: int = CACHE_TTL
 
     image_server_port_range: tuple[int, int] = (10000, 60000)
 
@@ -94,13 +107,13 @@ class Settings:
                     config_data = json.load(f)
                     # Load apikey from config (UserPreferences uses 'apikey')
 
-                    api_key = config_data.get("apikey", "")
+                    api_key = ApiKey.normalize(config_data.get("apikey"))
                     if api_key:
                         self.api_key = api_key
                         logger.info("API key loaded from config.json")
 
                     else:
-                        logger.warning("No API key found in config.json")
+                        logger.info("No API key found in config.json, using proxy API")
 
             except Exception as e:
                 logger.error(f"Failed to load API key from config: {e}")

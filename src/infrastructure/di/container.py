@@ -114,7 +114,11 @@ def setup_container() -> DiContainer:
         lambda c: DctwApiClient(
             api_key=settings.api_key,
             base_url=settings.api_base_url,
+            authenticated_base_url=settings.api_authenticated_base_url,
+            api_prefix=settings.api_version_prefix,
+            openapi_url=settings.api_openapi_url,
             user_agent=f"{settings.app_name}/{settings.app_version}",
+            config_storage=c.resolve(ConfigStorage),
         ),
         singleton=False,
     )

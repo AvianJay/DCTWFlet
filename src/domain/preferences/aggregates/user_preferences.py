@@ -46,7 +46,7 @@ class UserPreferences(AggregateRoot):
     ):
         super().__init__()
         self._theme = theme
-        self._api_key = api_key or ApiKey("dctw_live_683165bb3e9be69a_TWb0eEaUfXoMuZ9ONbh1RyT12pnjFq6uZQYUnnE8CTj")  # Default API key
+        self._api_key = api_key or ApiKey()
         self._nsfw_filter = nsfw_filter or NsfwFilter(False)
         self._update_check = update_check
         self._home_index = home_index

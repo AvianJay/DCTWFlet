@@ -66,7 +66,7 @@ class DctwServerRepository(ServerRepository):
         if not icon_url:
             icon_url = "https://cdn.discordapp.com/embed/avatars/0.png"
 
-        invite_url = data.get("invite_url", "").strip()
+        invite_url = (data.get("url") or data.get("invite_url") or "").strip()
         name = data.get("name", "").strip()
 
         if not name:
@@ -75,10 +75,10 @@ class DctwServerRepository(ServerRepository):
 
         if not invite_url:
             invite_url = "https://discord.gg/invalid"
-        
+
         if not data.get("bumped_at"):
             data["bumped_at"] = "1999-01-01T00:00:00Z"
-        
+
         if not data.get("created_at"):
             data["created_at"] = "1999-01-01T00:00:00Z"
 
@@ -86,12 +86,13 @@ class DctwServerRepository(ServerRepository):
             id=server_id,
             name=name,
             icon=AvatarUrl(icon_url),
-            description=data["description"],
+            description=data.get("description", ""),
             introduce=data.get("introduce", ""),
-            is_partnered=data.get("is_partnered", False),
+            is_partnered=data.get("partnered", data.get("is_partnered", False)),
             nsfw=data.get("nsfw", False),
             statistics=Statistics(
-                votes=data.get("votes", 0), count=data.get("members", 0)
+                votes=data.get("votes", 0),
+                count=data.get("member_count", data.get("members", 0)),
             ),
             tags=[
                 ServerTag(tag)
@@ -100,8 +101,12 @@ class DctwServerRepository(ServerRepository):
             ],
             links=ServerLinks(invite=InviteUrl(invite_url)),
             timestamps=Timestamps(
-                created_at=self._parse_datetime(data.get("created_at", "1999-01-01T00:00:00Z")),
-                bumped_at=self._parse_datetime(data.get("bumped_at", "1999-01-01T00:00:00Z")),
+                created_at=self._parse_datetime(
+                    data.get("created_at", "1999-01-01T00:00:00Z")
+                ),
+                bumped_at=self._parse_datetime(
+                    data.get("bumped_at", "1999-01-01T00:00:00Z")
+                ),
             ),
             banner=(
                 BannerUrl(data["banner_url"])
@@ -140,6 +145,11 @@ class DctwServerRepository(ServerRepository):
         """Parse date and time"""
         if isinstance(value, datetime):
             return value
+        if isinstance(value, (int, float)):
+            try:
+                return datetime.fromtimestamp(value, timezone.utc)
+            except:
+                pass
         if isinstance(value, str):
             try:
                 return datetime.fromisoformat(value).astimezone(timezone.utc)

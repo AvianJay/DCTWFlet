@@ -59,14 +59,14 @@ class DctwTemplateRepository(TemplateRepository):
 
         if not data.get("bumped_at"):
             data["bumped_at"] = "1999-01-01T00:00:00Z"
-        
+
         if not data.get("created_at"):
             data["created_at"] = "1999-01-01T00:00:00Z"
 
         return Template(
             id=int(data["id"]),
-            name=data["name"],
-            description=data["description"],
+            name=data.get("name", f"Template {data['id']}"),
+            description=data.get("description", ""),
             introduce=data.get("introduce", ""),
             nsfw=data.get("nsfw", False),
             statistics=Statistics(votes=data.get("votes", 0), count=0),
@@ -75,10 +75,14 @@ class DctwTemplateRepository(TemplateRepository):
                 for tag in data.get("tags", [])
                 if tag in TemplateTag.VALID_TAGS
             ],
-            links=TemplateLinks(share_url=data["share_url"]),
+            links=TemplateLinks(share_url=data.get("url", data.get("share_url", ""))),
             timestamps=Timestamps(
-                created_at=self._parse_datetime(data.get("created_at", "1999-01-01T00:00:00Z")),
-                bumped_at=self._parse_datetime(data.get("bumped_at", "1999-01-01T00:00:00Z")),
+                created_at=self._parse_datetime(
+                    data.get("created_at", "1999-01-01T00:00:00Z")
+                ),
+                bumped_at=self._parse_datetime(
+                    data.get("bumped_at", "1999-01-01T00:00:00Z")
+                ),
             ),
             pinned=data.get("pinned", False),
         )
@@ -107,6 +111,11 @@ class DctwTemplateRepository(TemplateRepository):
         """Parse date and time"""
         if isinstance(value, datetime):
             return value
+        if isinstance(value, (int, float)):
+            try:
+                return datetime.fromtimestamp(value, timezone.utc)
+            except:
+                pass
         if isinstance(value, str):
             try:
                 return datetime.fromisoformat(value).astimezone(timezone.utc)

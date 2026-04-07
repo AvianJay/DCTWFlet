@@ -72,14 +72,14 @@ class DctwBotRepository(BotRepository):
         if not avatar_url:
             avatar_url = "https://cdn.discordapp.com/embed/avatars/0.png"
 
-        invite_url = data.get("invite_url", "").strip()
+        invite_url = (data.get("url") or data.get("invite_url") or "").strip()
 
         if not invite_url:
             invite_url = "https://discord.com/oauth2/authorize?client_id=0"
-        
+
         if not data.get("bumped_at"):
             data["bumped_at"] = "1999-01-01T00:00:00Z"
-        
+
         if not data.get("created_at"):
             data["created_at"] = "1999-01-01T00:00:00Z"
 
@@ -87,26 +87,31 @@ class DctwBotRepository(BotRepository):
             id=bot_id,
             name=name,
             avatar=AvatarUrl(avatar_url),
-            description=data["description"],
+            description=data.get("description", ""),
             introduce=data.get("introduce", ""),
             status=ContentStatus.from_string(data.get("status", "unknown")),
             verified=data.get("verified", False),
-            is_partnered=data.get("is_partnered", False),
+            is_partnered=data.get("partnered", data.get("is_partnered", False)),
             nsfw=data.get("nsfw", False),
             statistics=Statistics(
-                votes=data.get("votes", 0), count=data.get("servers", 0)
+                votes=data.get("votes", 0),
+                count=data.get("server_count", data.get("servers", 0)),
             ),
             tags=[
                 BotTag(tag) for tag in data.get("tags", []) if tag in BotTag.VALID_TAGS
             ],
             links=BotLinks(
                 invite=InviteUrl(invite_url),
-                support_server=data.get("server_url"),
-                website=data.get("web_url"),
+                support_server=data.get("discord_url", data.get("server_url")),
+                website=data.get("website_url", data.get("web_url")),
             ),
             timestamps=Timestamps(
-                created_at=self._parse_datetime(data.get("created_at", "1999-01-01T00:00:00Z")),
-                bumped_at=self._parse_datetime(data.get("bumped_at", "1999-01-01T00:00:00Z")),
+                created_at=self._parse_datetime(
+                    data.get("created_at", "1999-01-01T00:00:00Z")
+                ),
+                bumped_at=self._parse_datetime(
+                    data.get("bumped_at", "1999-01-01T00:00:00Z")
+                ),
             ),
             banner=(
                 BannerUrl(data["banner_url"])
@@ -149,6 +154,11 @@ class DctwBotRepository(BotRepository):
         """Parse date and time"""
         if isinstance(value, datetime):
             return value
+        if isinstance(value, (int, float)):
+            try:
+                return datetime.fromtimestamp(value, timezone.utc)
+            except:
+                pass
         if isinstance(value, str):
             try:
                 return datetime.fromisoformat(value).astimezone(timezone.utc)

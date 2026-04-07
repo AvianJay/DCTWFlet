@@ -3,8 +3,19 @@ from domain.shared import ValueObject
 
 
 class ApiKey(ValueObject):
+    LEGACY_DEFAULT_API_KEY = (
+        "dctw_live_683165bb3e9be69a_TWb0eEaUfXoMuZ9ONbh1RyT12pnjFq6uZQYUnnE8CTj"
+    )
+
     def __init__(self, key: Optional[str] = None):
-        self._key = key.strip() if key else None
+        self._key = self.normalize(key)
+
+    @classmethod
+    def normalize(cls, key: Optional[str]) -> Optional[str]:
+        normalized = key.strip() if key else None
+        if not normalized or normalized == cls.LEGACY_DEFAULT_API_KEY:
+            return None
+        return normalized
 
     @property
     def value(self) -> Optional[str]:
