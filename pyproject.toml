@@ -3,7 +3,7 @@ name = "dctwflet"
 version = "0.1.1"
 description = "Taicoolah，讓宣傳 Discord 機器人、伺服器的平台變得太酷啦！"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 authors = [
     { name = "AvianJay", email = "avianjay@avianjay.sbs" }
 ]
