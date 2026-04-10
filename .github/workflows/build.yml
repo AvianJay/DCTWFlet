@@ -51,7 +51,7 @@ jobs:
 
       - name: Build APK
         run: |
-          poetry run flet build apk --verbose --no-rich-output --compile-app --compile-packages --android-signing-key-store "$PWD/sign.jks" --android-signing-key-store-password "$KEYSTORE_PASSWORD" --android-signing-key-password "$KEYSTORE_PASSWORD" --android-signing-key-alias "$KEY_ALIAS" --build-version "$COMMIT_HASH"
+          poetry run flet build apk --verbose --no-rich-output --compile-app --compile-packages --android-signing-key-store "$PWD/sign.jks" --android-signing-key-store-password "$KEYSTORE_PASSWORD" --android-signing-key-password "$KEYSTORE_PASSWORD" --android-signing-key-alias "$KEY_ALIAS" --build-version "$COMMIT_HASH" --yes
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
@@ -95,7 +95,7 @@ jobs:
 
       - name: Build AAB
         run: |
-          poetry run flet build aab --verbose --no-rich-output --compile-app --compile-packages --android-signing-key-store "$PWD/sign.jks" --android-signing-key-store-password "$KEYSTORE_PASSWORD" --android-signing-key-password "$KEYSTORE_PASSWORD" --android-signing-key-alias "$KEY_ALIAS" --build-version "$COMMIT_HASH"
+          poetry run flet build aab --verbose --no-rich-output --compile-app --compile-packages --android-signing-key-store "$PWD/sign.jks" --android-signing-key-store-password "$KEYSTORE_PASSWORD" --android-signing-key-password "$KEYSTORE_PASSWORD" --android-signing-key-alias "$KEY_ALIAS" --build-version "$COMMIT_HASH" --yes
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
@@ -144,7 +144,7 @@ jobs:
 
       - name: Build IPA
         run: |
-          poetry run flet build ipa --verbose --no-rich-output --compile-app --compile-packages
+          poetry run flet build ipa --verbose --no-rich-output --compile-app --compile-packages --yes
 
       - name: Generate unsigned IPA
         run: |
@@ -191,7 +191,7 @@ jobs:
 
       - name: Build macOS
         run: |
-          poetry run flet build macos --verbose --no-rich-output --compile-app --compile-packages --build-version "$COMMIT_HASH"
+          poetry run flet build macos --verbose --no-rich-output --compile-app --compile-packages --build-version "$COMMIT_HASH" --yes
 
       - name: Upload macOS
         uses: actions/upload-artifact@v4
@@ -227,7 +227,7 @@ jobs:
 
       - name: Build Windows
         run: |
-          poetry run flet build windows --verbose --no-rich-output --compile-app --compile-packages --build-version "$COMMIT_HASH"
+          poetry run flet build windows --verbose --no-rich-output --compile-app --compile-packages --build-version "$COMMIT_HASH" --yes
 
       - name: Upload Windows
         uses: actions/upload-artifact@v4
@@ -267,7 +267,7 @@ jobs:
 
       - name: Build Linux
         run: |
-          poetry run flet build linux --verbose --no-rich-output --compile-app --compile-packages --build-version "$COMMIT_HASH"
+          poetry run flet build linux --verbose --no-rich-output --compile-app --compile-packages --build-version "$COMMIT_HASH" --yes
 
       - name: Upload Linux
         uses: actions/upload-artifact@v4
@@ -303,7 +303,7 @@ jobs:
       - name: Build Web
         run: |
           echo "GITHUB_REPOSITORY: ${GITHUB_REPOSITORY}, USER: ${GITHUB_REPOSITORY%/*}, PROJECT_BASE_URL: ${GITHUB_REPOSITORY#*/}"
-          poetry run flet build web --verbose --no-rich-output --compile-app --compile-packages --build-version "$COMMIT_HASH" --base-url ${GITHUB_REPOSITORY#*/} --route-url-strategy hash
+          poetry run flet build web --verbose --no-rich-output --compile-app --compile-packages --build-version "$COMMIT_HASH" --base-url ${GITHUB_REPOSITORY#*/} --route-url-strategy hash --yes
 
       - name: Upload Web
         uses: actions/upload-pages-artifact@v3
