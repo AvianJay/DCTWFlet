@@ -10,11 +10,8 @@ authors = [
 dependencies = [
     "flet==0.84.0",
     "requests~=2.32.5",
-    "flask~=3.1.2",
     "aiofiles~=25.1.0",
     "httpx~=0.28.1",
-    "quart~=0.20.0",
-    "wsgiref~=0.1.2",
 ]
 
 [tool.flet]
@@ -39,10 +36,8 @@ path = "src"
 dev-dependencies = [
     "flet[all]==0.84.0",
     "requests~=2.32.5",
-    "flask~=3.1.2",
     "aiofiles~=25.1.0",
     "httpx~=0.28.1",
-    "quart~=0.20.0",
 ]
 
 [tool.poetry]
