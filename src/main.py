@@ -22,6 +22,7 @@ from presentation.pages import (
 from infrastructure.di import get_container
 from infrastructure.image import ImageServer
 from application.services import PreferenceService
+from infrastructure.config import initialize_settings
 
 
 logging.basicConfig(
@@ -31,8 +32,94 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def _show_startup_error(
+    page: ft.Page, error: Exception, console_log_file: str | None = None
+) -> None:
+    controls = [
+        ft.Icon(
+            ft.Icons.ERROR_OUTLINE,
+            size=56,
+            color=ft.Colors.ERROR,
+        ),
+        ft.Text(
+            "App startup failed",
+            size=22,
+            weight=ft.FontWeight.BOLD,
+            text_align=ft.TextAlign.CENTER,
+        ),
+        ft.Text(str(error), selectable=True, text_align=ft.TextAlign.CENTER),
+    ]
+
+    if console_log_file:
+        controls.append(
+            ft.Text(
+                f"console.log: {console_log_file}",
+                selectable=True,
+                text_align=ft.TextAlign.CENTER,
+            )
+        )
+
+    page.views.clear()
+    page.views.append(
+        ft.View(
+            route="/",
+            controls=[
+                ft.Container(
+                    content=ft.Column(
+                        controls,
+                        alignment=ft.MainAxisAlignment.CENTER,
+                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                        spacing=12,
+                    ),
+                    expand=True,
+                    alignment=ft.Alignment(0, 0),
+                )
+            ],
+            padding=20,
+        )
+    )
+    page.update()
+
+
+async def _configure_runtime_settings(page: ft.Page) -> str | None:
+    console_log_file = None
+
+    if page.web:
+        initialize_settings()
+        return console_log_file
+
+    storage_paths = ft.StoragePaths()
+    support_dir = await storage_paths.get_application_support_directory()
+    cache_dir = await storage_paths.get_application_cache_directory()
+    console_log_file = await storage_paths.get_console_log_filename()
+
+    support_path = Path(support_dir)
+    cache_path = Path(cache_dir)
+
+    initialize_settings(
+        data_dir=support_path,
+        cache_dir=cache_path,
+        image_cache_dir=cache_path / "images",
+        log_dir=cache_path / "logs",
+    )
+
+    logger.info("Configured runtime storage: support=%s cache=%s", support_path, cache_path)
+    return console_log_file
+
+
 async def main(page: ft.Page):
     """Application main entry point."""
+
+    console_log_file = None
+
+    try:
+        logger.info("Starting app on platform: %s", page.platform)
+        console_log_file = await _configure_runtime_settings(page)
+        container = get_container()
+    except Exception as ex:
+        logger.exception("Startup initialization failed")
+        _show_startup_error(page, ex, console_log_file)
+        return
 
     def navigate(route: str):
         if hasattr(page, "push_route"):
@@ -43,8 +130,6 @@ async def main(page: ft.Page):
     page.title = "DCTW"
     page.padding = 0
     page.bgcolor = ft.Colors.SURFACE
-
-    container = get_container()
 
     pref_service: PreferenceService = container.resolve(PreferenceService)
     try:

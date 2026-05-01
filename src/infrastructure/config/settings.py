@@ -122,6 +122,24 @@ class Settings:
 _settings: Optional[Settings] = None
 
 
+def initialize_settings(
+    *,
+    data_dir: Optional[Path] = None,
+    cache_dir: Optional[Path] = None,
+    image_cache_dir: Optional[Path] = None,
+    log_dir: Optional[Path] = None,
+) -> Settings:
+    global _settings
+    if _settings is None:
+        _settings = Settings(
+            data_dir=data_dir,
+            cache_dir=cache_dir,
+            image_cache_dir=image_cache_dir,
+            log_dir=log_dir,
+        )
+    return _settings
+
+
 def get_settings() -> Settings:
     global _settings
     if _settings is None:
