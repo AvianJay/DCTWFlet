@@ -9,7 +9,7 @@ import flet as ft
 logger = logging.getLogger(__name__)
 
 DEFAULT_DURATION = 2.5
-DEFAULT_BOTTOM_MARGIN = 90
+DEFAULT_BOTTOM_MARGIN = 72
 
 
 class Toast:
@@ -38,10 +38,11 @@ class Toast:
             content=ft.Text(
                 message,
                 size=13,
-                color=ft.Colors.ON_INVERSE_SURFACE,
+                color=ft.Colors.ON_SURFACE,
                 text_align=ft.TextAlign.CENTER,
             ),
-            bgcolor=ft.Colors.INVERSE_SURFACE,
+            bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST,
+            border=ft.border.all(1, ft.Colors.OUTLINE_VARIANT),
             padding=ft.padding.symmetric(horizontal=16, vertical=9),
             border_radius=20,
             shadow=ft.BoxShadow(

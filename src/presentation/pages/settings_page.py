@@ -18,8 +18,9 @@ from presentation.components import ApiKeyDialog, Toast
 class SettingsPage:
     """Settings page"""
 
-    def __init__(self, page: ft.Page):
+    def __init__(self, page: ft.Page, on_data_changed=None):
         self.page = page
+        self._on_data_changed = on_data_changed
         self.container = get_container()
         self.pref_service: PreferenceService = self.container.resolve(PreferenceService)
         self.discovery_service: DiscoveryService = self.container.resolve(
@@ -75,9 +76,9 @@ class SettingsPage:
             [
                 # Title bar
                 ft.Container(
-                    content=ft.Text("應用程式設定", size=24, weight=ft.FontWeight.BOLD),
+                    content=ft.Text("應用程式設定", size=20, weight=ft.FontWeight.BOLD),
                     bgcolor=ft.Colors.SURFACE,
-                    padding=15,
+                    padding=ft.padding.symmetric(horizontal=20, vertical=6),
                 ),
                 # Settings items
                 ft.Container(
@@ -242,6 +243,7 @@ class SettingsPage:
 
     async def _after_api_key_saved(self):
         await self._load_preferences()
+        self._notify_data_changed()
         self._show_success("API Key 已儲存，資料將重新載入")
 
     async def _save_api_key(self):
@@ -260,6 +262,7 @@ class SettingsPage:
             await self.pref_service.update_api_key(api_key)
             await self.discovery_service.clear_all_caches()
             await self._load_preferences()
+            self._notify_data_changed()
 
             self._show_success("API Key 已儲存，資料將重新載入")
 
@@ -273,6 +276,7 @@ class SettingsPage:
             await self.pref_service.update_api_key("")
             await self.discovery_service.clear_all_caches()
             await self._load_preferences()
+            self._notify_data_changed()
 
             self._show_success("API Key 已清除")
 
@@ -294,6 +298,15 @@ class SettingsPage:
     def _show_success(self, message: str):
         """Show a small message at the bottom of the page"""
         self.toast.show(message)
+
+    def _notify_data_changed(self) -> None:
+        """Tell the shell that the cached data tabs have to be rebuilt."""
+        if self._on_data_changed is None:
+            return
+        try:
+            self._on_data_changed()
+        except Exception as ex:
+            print(f"Error reloading data tabs: {ex}")
 
     def _show_error(self, message: str):
         """Show error message"""

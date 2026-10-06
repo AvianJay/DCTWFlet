@@ -143,8 +143,8 @@ async def main(page: ft.Page):
         logger.error(str(e))
         page.theme_mode = ft.ThemeMode.SYSTEM
 
-    page.theme = ft.Theme(navigation_bar_theme=ft.NavigationBarTheme(height=64))
-    page.dark_theme = ft.Theme(navigation_bar_theme=ft.NavigationBarTheme(height=64))
+    page.theme = ft.Theme(navigation_bar_theme=ft.NavigationBarTheme(height=56))
+    page.dark_theme = ft.Theme(navigation_bar_theme=ft.NavigationBarTheme(height=56))
 
     image_server: ImageServer = container.resolve(ImageServer)
 
@@ -158,69 +158,86 @@ async def main(page: ft.Page):
 
     current_tab = [0]
 
+    tab_titles = (
+        "DCTW - 機器人清單",
+        "DCTW - 伺服器清單",
+        "DCTW - 模板清單",
+        "DCTW - 設置",
+    )
+
     bot_page = BotListPage(page)
     server_page = ServerListPage(page)
     template_page = TemplateListPage(page)
-    settings_page = SettingsPage(page)
 
-    def create_home_view() -> ft.View:
-        content_container = ft.Container(expand=True)
+    # Every tab is built once and kept alive. Rebuilding the pages on each tab
+    # switch re-parented the same widgets and started competing background
+    # tasks, which could leave the UI stuck on the previous tab.
+    built_tabs: dict[int, ft.Control] = {}
+    content_container = ft.Container(expand=True)
 
-        def on_tab_changed(e):
-            """Tab change event handler"""
-            index = e.control.selected_index
-            current_tab[0] = index
-
+    def tab_content(index: int) -> ft.Control:
+        """Return the content of a tab, building it on first use."""
+        if index not in built_tabs:
             if index == 0:
-                page.title = "DCTW - 機器人清單"
-                content_container.content = bot_page.build()
+                built_tabs[index] = bot_page.build()
             elif index == 1:
-                page.title = "DCTW - 伺服器清單"
-                content_container.content = server_page.build()
+                built_tabs[index] = server_page.build()
             elif index == 2:
-                page.title = "DCTW - 模板清單"
-                content_container.content = template_page.build()
-            elif index == 3:
-                page.title = "DCTW - 設置"
-                content_container.content = settings_page.build()
+                built_tabs[index] = template_page.build()
+            else:
+                built_tabs[index] = settings_page.build()
+        return built_tabs[index]
 
+    def reload_data_tabs() -> None:
+        """Rebuild the data tabs after the API key changed."""
+        for index in (0, 1, 2):
+            built_tabs.pop(index, None)
+        if current_tab[0] in (0, 1, 2):
+            content_container.content = tab_content(current_tab[0])
             page.update()
 
-        navigation_bar = ft.NavigationBar(
-            destinations=[
-                ft.NavigationBarDestination(
-                    icon=ft.Icons.SMART_TOY_OUTLINED,
-                    selected_icon=ft.Icons.SMART_TOY,
-                    label="機器人",
-                ),
-                ft.NavigationBarDestination(
-                    icon=ft.Icons.DNS_OUTLINED,
-                    selected_icon=ft.Icons.DNS,
-                    label="伺服器",
-                ),
-                ft.NavigationBarDestination(
-                    icon=ft.Icons.COPY_ALL_OUTLINED,
-                    selected_icon=ft.Icons.COPY_ALL,
-                    label="模板",
-                ),
-                ft.NavigationBarDestination(
-                    icon=ft.Icons.SETTINGS_OUTLINED,
-                    selected_icon=ft.Icons.SETTINGS,
-                    label="設置",
-                ),
-            ],
-            selected_index=current_tab[0],
-            on_change=on_tab_changed,
-        )
+    settings_page = SettingsPage(page, on_data_changed=reload_data_tabs)
 
-        if current_tab[0] == 0:
-            content_container.content = bot_page.build()
-        elif current_tab[0] == 1:
-            content_container.content = server_page.build()
-        elif current_tab[0] == 2:
-            content_container.content = template_page.build()
-        else:
-            content_container.content = settings_page.build()
+    def select_tab(index: int) -> None:
+        current_tab[0] = index
+        page.title = tab_titles[index]
+        content_container.content = tab_content(index)
+
+    def on_tab_changed(e):
+        """Tab change event handler"""
+        select_tab(e.control.selected_index)
+        page.update()
+
+    navigation_bar = ft.NavigationBar(
+        destinations=[
+            ft.NavigationBarDestination(
+                icon=ft.Icons.SMART_TOY_OUTLINED,
+                selected_icon=ft.Icons.SMART_TOY,
+                label="機器人",
+            ),
+            ft.NavigationBarDestination(
+                icon=ft.Icons.DNS_OUTLINED,
+                selected_icon=ft.Icons.DNS,
+                label="伺服器",
+            ),
+            ft.NavigationBarDestination(
+                icon=ft.Icons.COPY_ALL_OUTLINED,
+                selected_icon=ft.Icons.COPY_ALL,
+                label="模板",
+            ),
+            ft.NavigationBarDestination(
+                icon=ft.Icons.SETTINGS_OUTLINED,
+                selected_icon=ft.Icons.SETTINGS,
+                label="設置",
+            ),
+        ],
+        selected_index=current_tab[0],
+        on_change=on_tab_changed,
+    )
+
+    def create_home_view() -> ft.View:
+        navigation_bar.selected_index = current_tab[0]
+        select_tab(current_tab[0])
 
         return ft.View(
             route="/",
@@ -366,6 +383,7 @@ async def main(page: ft.Page):
                     preference_service=pref_service,
                     discovery_service=container.resolve(DiscoveryService),
                     api_client=container.resolve(DctwApiClient),
+                    on_saved=reload_data_tabs,
                 )
                 dialog.show(dismissible=True)
             except Exception:

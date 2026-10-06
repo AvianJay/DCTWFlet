@@ -3,13 +3,13 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from ..config.constants import DCTW_API_BASE_URL
+from ..config.constants import DCTW_API_BASE_URL, DEFAULT_AVATAR_URL
 
 # DCTW stores timestamps without a timezone offset in UTC+8 (Taipei).
 DCTW_TIMEZONE = timezone(timedelta(hours=8))
 
 # Avatar used when the API does not provide a usable image.
-FALLBACK_AVATAR_URL = "https://cdn.discordapp.com/embed/avatars/0.png"
+FALLBACK_AVATAR_URL = DEFAULT_AVATAR_URL
 
 # Relative paths the website uses as placeholders for items without an icon.
 # They are not served as real images, so they fall back to the default avatar.

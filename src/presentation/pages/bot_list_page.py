@@ -14,6 +14,7 @@ from domain.discovery.value_objects import (
 )
 from domain.discovery.entities import Bot
 from infrastructure.api import ApiKeyMissingError, InvalidApiKeyError
+from infrastructure.config.constants import DEFAULT_AVATAR_URL
 from infrastructure.di import get_container
 from presentation.tag_mappings import BOT_TAGS
 
@@ -212,6 +213,8 @@ class BotListPage:
                             [
                                 ft.CircleAvatar(
                                     foreground_image_src=bot.avatar.value,
+                                    background_image_src=DEFAULT_AVATAR_URL,
+                                    bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST,
                                     radius=25,
                                 ),
                                 ft.Column(
