@@ -13,6 +13,7 @@ from domain.discovery.value_objects import (
     TemplateTag,
 )
 from domain.discovery.entities import Template
+from infrastructure.api import ApiKeyMissingError, InvalidApiKeyError
 from infrastructure.di import get_container
 from presentation.tag_mappings import TEMPLATE_TAGS
 
@@ -111,9 +112,19 @@ class TemplateListPage:
 
             self._render_template_list(templates)
 
+        except ApiKeyMissingError:
+            self._render_message(
+                "尚未設定 API Key\n"
+                "請到「設定」頁面點擊「從剪貼簿貼上 API Key」。"
+            )
+        except InvalidApiKeyError:
+            self._render_message(
+                "API Key 無效或已失效\n"
+                "請到 DCTW 後台重新複製 API KEY，再到「設定」頁面貼上。"
+            )
         except Exception as e:
             print(f"Error loading templates: {e}")
-            self._show_error(f"載入失敗: {str(e)}")
+            self._render_message(f"載入失敗: {str(e)}")
 
         finally:
             self.progress.visible = False
@@ -135,6 +146,30 @@ class TemplateListPage:
             for template in templates:
                 self.template_list.controls.append(self._create_template_card(template))
 
+        self.page.update()
+
+    def _render_message(self, message: str):
+        """Render a status message in place of the list"""
+        self.template_list.controls.clear()
+        self.template_list.controls.append(
+            ft.Container(
+                content=ft.Column(
+                    [
+                        ft.Icon(ft.Icons.ERROR_OUTLINE, size=40, color=ft.Colors.GREY),
+                        ft.Text(
+                            message,
+                            size=15,
+                            text_align=ft.TextAlign.CENTER,
+                        ),
+                    ],
+                    spacing=12,
+                    alignment=ft.MainAxisAlignment.CENTER,
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                ),
+                alignment=ft.Alignment(0, 0),
+                padding=40,
+            )
+        )
         self.page.update()
 
     def _create_template_card(self, template: Template) -> ft.Control:
@@ -285,10 +320,9 @@ class TemplateListPage:
 
     def _show_error(self, message: str):
         """Show error message"""
-        snack = ft.SnackBar(
-            content=ft.Text(message),
-            bgcolor=ft.Colors.ERROR,
+        self.page.show_dialog(
+            ft.SnackBar(
+                content=ft.Text(message),
+                bgcolor=ft.Colors.ERROR,
+            )
         )
-        self.page.snack_bar = snack
-        snack.open = True
-        self.page.update()

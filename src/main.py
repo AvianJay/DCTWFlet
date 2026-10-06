@@ -19,9 +19,11 @@ from presentation.pages import (
     ServerDetailPage,
     TemplateDetailPage,
 )
+from presentation.components import ApiKeyDialog
 from infrastructure.di import get_container
+from infrastructure.api import DctwApiClient
 from infrastructure.image import ImageServer
-from application.services import PreferenceService
+from application.services import DiscoveryService, PreferenceService
 from infrastructure.config import initialize_settings
 
 
@@ -132,6 +134,7 @@ async def main(page: ft.Page):
     page.bgcolor = ft.Colors.SURFACE
 
     pref_service: PreferenceService = container.resolve(PreferenceService)
+    prefs = None
     try:
         prefs = await pref_service.load_preferences()
         page.theme_mode = prefs.theme.value
@@ -352,6 +355,23 @@ async def main(page: ft.Page):
     if not page.route:
         page.route = "/"
     route_change(None)
+
+    if prefs is not None and not prefs.api_key.is_set:
+
+        async def show_api_key_onboarding():
+            await asyncio.sleep(1.0)
+            try:
+                dialog = ApiKeyDialog(
+                    page=page,
+                    preference_service=pref_service,
+                    discovery_service=container.resolve(DiscoveryService),
+                    api_client=container.resolve(DctwApiClient),
+                )
+                dialog.show(dismissible=True)
+            except Exception:
+                logger.exception("Failed to show API key onboarding dialog")
+
+        asyncio.create_task(show_api_key_onboarding())
 
 
 if __name__ == "__main__":

@@ -61,13 +61,15 @@ class DctwServerRepository(ServerRepository):
         """Map API data to domain model"""
         server_id = int(data["id"])
 
-        icon_url = data.get("icon_url", "").strip()
+        icon_url = (data.get("avatar") or data.get("icon_url") or "").strip()
 
         if not icon_url:
             icon_url = "https://cdn.discordapp.com/embed/avatars/0.png"
 
-        invite_url = (data.get("url") or data.get("invite_url") or "").strip()
-        name = data.get("name", "").strip()
+        invite_url = (
+            data.get("inviteLink") or data.get("url") or data.get("invite_url") or ""
+        ).strip()
+        name = (data.get("name") or "").strip()
 
         if not name:
             name = f"Server {server_id}"
@@ -75,6 +77,14 @@ class DctwServerRepository(ServerRepository):
 
         if not invite_url:
             invite_url = "https://discord.gg/invalid"
+
+        banner_url = (data.get("banner") or data.get("banner_url") or "").strip()
+        badge = data.get("badge") if isinstance(data.get("badge"), dict) else {}
+        is_partnered = bool(
+            badge.get("partner")
+            or data.get("partnered")
+            or data.get("is_partnered", False)
+        )
 
         if not data.get("bumped_at"):
             data["bumped_at"] = "1999-01-01T00:00:00Z"
@@ -86,17 +96,17 @@ class DctwServerRepository(ServerRepository):
             id=server_id,
             name=name,
             icon=AvatarUrl(icon_url),
-            description=data.get("description", ""),
-            introduce=data.get("introduce", ""),
-            is_partnered=data.get("partnered", data.get("is_partnered", False)),
-            nsfw=data.get("nsfw", False),
+            description=data.get("description") or "",
+            introduce=data.get("introduce") or "",
+            is_partnered=is_partnered,
+            nsfw=bool(data.get("nsfw", False)),
             statistics=Statistics(
-                votes=data.get("votes", 0),
-                count=data.get("member_count", data.get("members", 0)),
+                votes=int(data.get("vote_count", data.get("votes", 0)) or 0),
+                count=int(data.get("members", data.get("member_count", 0)) or 0),
             ),
             tags=[
                 ServerTag(tag)
-                for tag in data.get("tags", [])
+                for tag in (data.get("tags") or [])
                 if tag in ServerTag.VALID_TAGS
             ],
             links=ServerLinks(invite=InviteUrl(invite_url)),
@@ -109,9 +119,7 @@ class DctwServerRepository(ServerRepository):
                 ),
             ),
             banner=(
-                BannerUrl(data["banner_url"])
-                if data.get("banner_url") and data.get("banner_url").strip()
-                else None
+                BannerUrl(banner_url) if banner_url else None
             ),
             pinned=data.get("pinned", False),
         )

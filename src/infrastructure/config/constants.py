@@ -5,12 +5,11 @@ APP_VERSION = "0.1.2"
 CACHE_TTL = 60  # seconds
 
 # API URLs
-DCTW_API_PROXY_BASE_URL = "https://dctw-apiproxy.avianjay.sbs/proxy/api/v2"
-DCTW_API_AUTH_BASE_URL = "https://dctw.nkhost.dev"
+DCTW_API_BASE_URL = "https://dctw.xyz"
 DCTW_API_VERSION_PREFIX = "/api/v2"
-DCTW_API_OPENAPI_URL = "https://dctw.nkhost.dev/api/v2/openapi.json"
-DCTW_API_BASE_URL = DCTW_API_PROXY_BASE_URL
 DCTW_WEBSITE_URL = "https://dctw.xyz"
+DCTW_API_KEY_DOC_URL = "https://dctw.xyz/docs/api-key"
+DCTW_API_DOC_URL = "https://dctw.xyz/docs/api-get-items"
 
 # Update channels
 UPDATE_CHANNEL_DEVELOPER = "developer"

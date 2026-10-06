@@ -62,20 +62,24 @@ class DctwBotRepository(BotRepository):
         """Map API data to domain model"""
 
         bot_id = int(data["id"])
-        name = data.get("name", "").strip()
+        name = (data.get("name") or "").strip()
         if not name:
             name = f"Bot {bot_id}"
             logger.warning(f"Bot {bot_id} has empty name, using fallback")
 
-        avatar_url = data.get("avatar_url", "").strip()
+        avatar_url = (data.get("avatar") or data.get("avatar_url") or "").strip()
 
         if not avatar_url:
             avatar_url = "https://cdn.discordapp.com/embed/avatars/0.png"
 
-        invite_url = (data.get("url") or data.get("invite_url") or "").strip()
+        invite_url = (
+            data.get("inviteLink") or data.get("url") or data.get("invite_url") or ""
+        ).strip()
 
         if not invite_url:
             invite_url = "https://discord.com/oauth2/authorize?client_id=0"
+
+        banner_url = (data.get("banner") or data.get("banner_url") or "").strip()
 
         if not data.get("bumped_at"):
             data["bumped_at"] = "1999-01-01T00:00:00Z"
@@ -83,27 +87,41 @@ class DctwBotRepository(BotRepository):
         if not data.get("created_at"):
             data["created_at"] = "1999-01-01T00:00:00Z"
 
+        verified = bool(
+            data.get("is_official_verified")
+            or data.get("is_dc_verified")
+            or data.get("verified", False)
+        )
+
         return Bot(
             id=bot_id,
             name=name,
             avatar=AvatarUrl(avatar_url),
-            description=data.get("description", ""),
-            introduce=data.get("introduce", ""),
+            description=data.get("description") or "",
+            introduce=data.get("introduce") or "",
             status=ContentStatus.from_string(data.get("status", "unknown")),
-            verified=data.get("verified", False),
-            is_partnered=data.get("partnered", data.get("is_partnered", False)),
-            nsfw=data.get("nsfw", False),
+            verified=verified,
+            is_partnered=bool(
+                data.get("partnered") or data.get("is_partnered", False)
+            ),
+            nsfw=bool(data.get("nsfw", False)),
             statistics=Statistics(
-                votes=data.get("votes", 0),
-                count=data.get("server_count", data.get("servers", 0)),
+                votes=int(data.get("vote_count", data.get("votes", 0)) or 0),
+                count=int(data.get("servers", data.get("server_count", 0)) or 0),
             ),
             tags=[
-                BotTag(tag) for tag in data.get("tags", []) if tag in BotTag.VALID_TAGS
+                BotTag(tag)
+                for tag in (data.get("tags") or [])
+                if tag in BotTag.VALID_TAGS
             ],
             links=BotLinks(
                 invite=InviteUrl(invite_url),
-                support_server=data.get("discord_url", data.get("server_url")),
-                website=data.get("website_url", data.get("web_url")),
+                support_server=data.get("serverLink")
+                or data.get("discord_url")
+                or data.get("server_url"),
+                website=data.get("webLink")
+                or data.get("website_url")
+                or data.get("web_url"),
             ),
             timestamps=Timestamps(
                 created_at=self._parse_datetime(
@@ -114,9 +132,7 @@ class DctwBotRepository(BotRepository):
                 ),
             ),
             banner=(
-                BannerUrl(data["banner_url"])
-                if data.get("banner_url") and data.get("banner_url").strip()
-                else None
+                BannerUrl(banner_url) if banner_url else None
             ),
             pinned=data.get("pinned", False),
         )

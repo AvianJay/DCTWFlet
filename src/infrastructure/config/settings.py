@@ -12,9 +12,7 @@ from .constants import (
     APP_NAME,
     APP_VERSION,
     CACHE_TTL,
-    DCTW_API_AUTH_BASE_URL,
     DCTW_API_BASE_URL,
-    DCTW_API_OPENAPI_URL,
     DCTW_API_VERSION_PREFIX,
 )
 
@@ -34,9 +32,7 @@ class Settings:
     image_cache_dir: Path = None
     log_dir: Path = None
     api_base_url: str = DCTW_API_BASE_URL
-    api_authenticated_base_url: str = DCTW_API_AUTH_BASE_URL
     api_version_prefix: str = DCTW_API_VERSION_PREFIX
-    api_openapi_url: str = DCTW_API_OPENAPI_URL
     api_key: Optional[str] = None
     cache_ttl: int = CACHE_TTL
 

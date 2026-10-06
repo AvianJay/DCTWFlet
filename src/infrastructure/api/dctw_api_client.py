@@ -1,88 +1,112 @@
-"""DCTW API client"""
+"""DCTW API client (API v2)"""
 
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 import logging
 import httpx
 
 from domain.preferences.value_objects import ApiKey
 from infrastructure.filesystem import ConfigStorage
-from ..config.constants import (
-    DCTW_API_AUTH_BASE_URL,
-    DCTW_API_BASE_URL,
-    DCTW_API_OPENAPI_URL,
-    DCTW_API_VERSION_PREFIX,
-)
+from ..config.constants import DCTW_API_BASE_URL, DCTW_API_VERSION_PREFIX
 from .http_client import AsyncHttpClient
 
 logger = logging.getLogger(__name__)
 
 
-class DctwApiClient:
-    """DCTW API client with automatic proxy/authenticated routing."""
+class DctwApiError(Exception):
+    """Base error for DCTW API failures"""
 
-    DEFAULT_PROXY_BASE_URL = DCTW_API_BASE_URL
-    DEFAULT_AUTH_BASE_URL = DCTW_API_AUTH_BASE_URL
+
+class ApiKeyMissingError(DctwApiError):
+    """Raised when an API request needs a key but none is configured"""
+
+
+class InvalidApiKeyError(DctwApiError):
+    """Raised when the DCTW API rejects the configured API key"""
+
+
+class DctwApiClient:
+    """DCTW API v2 client.
+
+    All API v2 endpoints require an API key sent as a Bearer token.
+    Users get their key by logging in with Discord on https://dctw.xyz
+    and copying it from the dashboard.
+    """
+
+    DEFAULT_BASE_URL = DCTW_API_BASE_URL
     DEFAULT_API_PREFIX = DCTW_API_VERSION_PREFIX
-    DEFAULT_OPENAPI_URL = DCTW_API_OPENAPI_URL
-    DEFAULT_PAGE_LIMIT = 50
+    MAX_PAGES = 50
 
     def __init__(
         self,
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
-        authenticated_base_url: Optional[str] = None,
         api_prefix: Optional[str] = None,
-        openapi_url: Optional[str] = None,
         user_agent: str = "DCTWFlet/0.1.0",
         config_storage: Optional[ConfigStorage] = None,
     ):
         self._default_api_key = ApiKey.normalize(api_key)
-        self._proxy_base_url = (base_url or self.DEFAULT_PROXY_BASE_URL).rstrip("/")
-        self._authenticated_base_url = (
-            authenticated_base_url or self.DEFAULT_AUTH_BASE_URL
-        ).rstrip("/")
+        self._base_url = (base_url or self.DEFAULT_BASE_URL).rstrip("/")
         self._api_prefix = self._normalize_path_prefix(
             api_prefix or self.DEFAULT_API_PREFIX
         )
-        self._openapi_url = openapi_url or self.DEFAULT_OPENAPI_URL
         self._user_agent = user_agent
         self._config_storage = config_storage
-        self._openapi_schema: Optional[Dict[str, Any]] = None
-        self._page_limit_cache: Dict[str, int] = {}
 
     @property
-    def openapi_url(self) -> str:
-        return self._openapi_url
+    def base_url(self) -> str:
+        return self._base_url
+
+    @property
+    def api_prefix(self) -> str:
+        return self._api_prefix
 
     async def get_bots(self) -> List[Dict[str, Any]]:
         """Get all bots."""
         logger.info("Fetching bots from DCTW API")
-        return await self._get_paginated_collection("/bots")
+        return await self._get_collection("/bots/")
 
     async def get_bot_comments(self, bot_id: int) -> List[Dict[str, Any]]:
         """Get bot comments."""
         logger.info(f"Fetching comments for bot {bot_id}")
-        return await self._get_items(f"/bots/{bot_id}/comments")
+        return await self._get_collection(f"/bots/{bot_id}/comments/")
 
     async def get_servers(self) -> List[Dict[str, Any]]:
         """Get all servers."""
         logger.info("Fetching servers from DCTW API")
-        return await self._get_paginated_collection("/servers")
+        return await self._get_collection("/servers/")
 
     async def get_server_comments(self, server_id: int) -> List[Dict[str, Any]]:
         """Get server comments."""
         logger.info(f"Fetching comments for server {server_id}")
-        return await self._get_items(f"/servers/{server_id}/comments")
+        return await self._get_collection(f"/servers/{server_id}/comments/")
 
     async def get_templates(self) -> List[Dict[str, Any]]:
         """Get all templates."""
         logger.info("Fetching templates from DCTW API")
-        return await self._get_paginated_collection("/templates")
+        return await self._get_collection("/templates/")
 
     async def get_template_comments(self, template_id: int) -> List[Dict[str, Any]]:
         """Get template comments."""
         logger.info(f"Fetching comments for template {template_id}")
-        return await self._get_items(f"/templates/{template_id}/comments")
+        return await self._get_collection(f"/templates/{template_id}/comments/")
+
+    async def validate_api_key(self, api_key: Optional[str]) -> bool:
+        """Check whether the DCTW API accepts the given API key."""
+        key = ApiKey.normalize(api_key)
+        if not key:
+            return False
+
+        try:
+            async with AsyncHttpClient(
+                self._base_url, headers=self._build_headers(key)
+            ) as client:
+                await client.get(self._resolve_endpoint("/bots/"))
+            return True
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code in (401, 403):
+                logger.info("API key validation rejected with %s", e.response.status_code)
+                return False
+            raise
 
     async def post(
         self,
@@ -91,59 +115,66 @@ class DctwApiClient:
         data: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """POST to an authenticated DCTW endpoint."""
-        base_url, headers, is_authenticated = await self._resolve_request_config()
-        if not is_authenticated:
-            raise RuntimeError(
-                "POST endpoints require a user-provided API key because the proxy only allows GET requests."
+        api_key = await self._require_api_key()
+        resolved_endpoint = self._resolve_endpoint(endpoint)
+
+        async with AsyncHttpClient(
+            self._base_url, headers=self._build_headers(api_key)
+        ) as client:
+            return await self._request(
+                client, "POST", resolved_endpoint, json=json, data=data
             )
 
-        resolved_endpoint = self._resolve_endpoint(endpoint, is_authenticated)
-        async with AsyncHttpClient(base_url, headers=headers) as client:
-            return await client.post(resolved_endpoint, json=json, data=data)
-
-    async def _get_paginated_collection(self, endpoint: str) -> List[Dict[str, Any]]:
-        base_url, headers, is_authenticated = await self._resolve_request_config()
-        resolved_endpoint = self._resolve_endpoint(endpoint, is_authenticated)
-        page_limit = await self._get_page_limit(endpoint)
+    async def _get_collection(self, endpoint: str) -> List[Dict[str, Any]]:
+        api_key = await self._require_api_key()
         items: List[Dict[str, Any]] = []
         cursor: Optional[str] = None
 
-        async with AsyncHttpClient(base_url, headers=headers) as client:
-            while True:
-                params: Dict[str, Any] = {"limit": page_limit}
-                if cursor:
-                    params["cursor"] = cursor
+        async with AsyncHttpClient(
+            self._base_url, headers=self._build_headers(api_key)
+        ) as client:
+            for _ in range(self.MAX_PAGES):
+                params: Optional[Dict[str, Any]] = {"cursor": cursor} if cursor else None
+                response = await self._request(
+                    client, "GET", self._resolve_endpoint(endpoint), params=params
+                )
+                items.extend(self._extract_items(response))
 
-                response = await client.get(resolved_endpoint, params=params)
-                page_items = self._extract_items(response)
-                items.extend(page_items)
-
-                if not isinstance(response, dict):
-                    break
-
-                cursor = response.get("next_cursor")
+                cursor = self._extract_cursor(response)
                 if not cursor:
                     break
 
         return items
 
-    async def _get_items(self, endpoint: str) -> List[Dict[str, Any]]:
-        base_url, headers, is_authenticated = await self._resolve_request_config()
-        resolved_endpoint = self._resolve_endpoint(endpoint, is_authenticated)
+    async def _request(self, client: AsyncHttpClient, method: str, endpoint: str, **kwargs):
+        """Send a request and translate auth failures into domain errors."""
+        try:
+            if method == "GET":
+                return await client.get(endpoint, **kwargs)
+            if method == "POST":
+                return await client.post(endpoint, **kwargs)
+            raise ValueError(f"Unsupported method: {method}")
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code in (401, 403):
+                raise InvalidApiKeyError(
+                    "DCTW API Key 無效或已失效，請重新登入取得新的 API Key。"
+                ) from e
+            raise
 
-        async with AsyncHttpClient(base_url, headers=headers) as client:
-            response = await client.get(resolved_endpoint)
-            return self._extract_items(response)
-
-    async def _resolve_request_config(self) -> Tuple[str, Dict[str, str], bool]:
+    async def _require_api_key(self) -> str:
         api_key = await self._load_runtime_api_key()
-        headers = {"User-Agent": self._user_agent}
+        if not api_key:
+            raise ApiKeyMissingError(
+                "尚未設定 DCTW API Key，請使用 Discord 登入取得 API Key。"
+            )
+        return api_key
 
-        if api_key:
-            headers["x-api-key"] = api_key
-            return self._authenticated_base_url, headers, True
-
-        return self._proxy_base_url, headers, False
+    def _build_headers(self, api_key: str) -> Dict[str, str]:
+        return {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "User-Agent": self._user_agent,
+        }
 
     async def _load_runtime_api_key(self) -> Optional[str]:
         if self._config_storage is not None:
@@ -158,67 +189,12 @@ class DctwApiClient:
 
         return self._default_api_key
 
-    async def _get_page_limit(self, endpoint: str) -> int:
-        cache_key = self._normalize_path_prefix(endpoint)
-        if cache_key in self._page_limit_cache:
-            return self._page_limit_cache[cache_key]
-
-        page_limit = self.DEFAULT_PAGE_LIMIT
-
-        try:
-            schema = await self._get_openapi_schema()
-            schema_path = f"{self._api_prefix}{cache_key}"
-            parameters = schema.get("paths", {}).get(schema_path, {}).get("get", {}).get(
-                "parameters",
-                [],
-            )
-
-            for parameter in parameters:
-                if parameter.get("name") != "limit":
-                    continue
-
-                parameter_schema = parameter.get("schema", {})
-                page_limit = int(
-                    parameter_schema.get(
-                        "maximum",
-                        parameter_schema.get("default", self.DEFAULT_PAGE_LIMIT),
-                    )
-                )
-                break
-        except Exception as e:
-            logger.warning(
-                f"Failed to load page limit from OpenAPI for {endpoint}: {e}"
-            )
-
-        self._page_limit_cache[cache_key] = page_limit
-        logger.info(
-            f"Resolved page limit for {cache_key or '/'} from OpenAPI: {page_limit}"
-        )
-        return page_limit
-
-    async def _get_openapi_schema(self) -> Dict[str, Any]:
-        if self._openapi_schema is not None:
-            return self._openapi_schema
-
-        async with httpx.AsyncClient(
-            headers={"User-Agent": self._user_agent},
-            timeout=30.0,
-            follow_redirects=True,
-        ) as client:
-            response = await client.get(self._openapi_url)
-            response.raise_for_status()
-            self._openapi_schema = response.json()
-
-        return self._openapi_schema
-
-    def _resolve_endpoint(self, endpoint: str, is_authenticated: bool) -> str:
+    def _resolve_endpoint(self, endpoint: str) -> str:
         normalized_endpoint = self._normalize_path_prefix(endpoint)
-        if not is_authenticated:
-            return normalized_endpoint
-
         if normalized_endpoint.startswith(f"{self._api_prefix}/"):
             return normalized_endpoint
-
+        if normalized_endpoint == self._api_prefix:
+            return normalized_endpoint
         return f"{self._api_prefix}{normalized_endpoint}"
 
     @staticmethod
@@ -234,6 +210,15 @@ class DctwApiClient:
             return response
 
         return []
+
+    @staticmethod
+    def _extract_cursor(response: Any) -> Optional[str]:
+        if isinstance(response, dict):
+            for key in ("next_cursor", "next", "cursor"):
+                value = response.get(key)
+                if isinstance(value, str) and value:
+                    return value
+        return None
 
     @staticmethod
     def _normalize_path_prefix(value: str) -> str:

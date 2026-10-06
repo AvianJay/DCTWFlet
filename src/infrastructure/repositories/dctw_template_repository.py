@@ -63,19 +63,28 @@ class DctwTemplateRepository(TemplateRepository):
         if not data.get("created_at"):
             data["created_at"] = "1999-01-01T00:00:00Z"
 
+        share_url = (
+            data.get("shareLink")
+            or data.get("url")
+            or data.get("share_url")
+            or ""
+        ).strip()
+
         return Template(
             id=int(data["id"]),
-            name=data.get("name", f"Template {data['id']}"),
-            description=data.get("description", ""),
-            introduce=data.get("introduce", ""),
-            nsfw=data.get("nsfw", False),
-            statistics=Statistics(votes=data.get("votes", 0), count=0),
+            name=data.get("name") or f"Template {data['id']}",
+            description=data.get("description") or "",
+            introduce=data.get("introduce") or "",
+            nsfw=bool(data.get("nsfw", False)),
+            statistics=Statistics(
+                votes=int(data.get("vote_count", data.get("votes", 0)) or 0), count=0
+            ),
             tags=[
                 TemplateTag(tag)
-                for tag in data.get("tags", [])
+                for tag in (data.get("tags") or [])
                 if tag in TemplateTag.VALID_TAGS
             ],
-            links=TemplateLinks(share_url=data.get("url", data.get("share_url", ""))),
+            links=TemplateLinks(share_url=share_url),
             timestamps=Timestamps(
                 created_at=self._parse_datetime(
                     data.get("created_at", "1999-01-01T00:00:00Z")

@@ -43,18 +43,23 @@ jobs:
           pip install poetry
           poetry install
 
-      - name: Decode keystore
+      - name: Decode keystore (optional)
         run: |
-          echo "$KEYSTORE_BASE64" | base64 --decode > sign.jks
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > sign.jks
+            echo "SIGN_ARGS=--android-signing-key-store $PWD/sign.jks --android-signing-key-store-password $KEYSTORE_PASSWORD --android-signing-key-password $KEYSTORE_PASSWORD --android-signing-key-alias $KEY_ALIAS" >> "$GITHUB_ENV"
+          else
+            echo "KEYSTORE_BASE64 is not set - the APK will be debug-signed (not release-signed)."
+            echo "SIGN_ARGS=" >> "$GITHUB_ENV"
+          fi
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
 
       - name: Build APK
         run: |
-          poetry run flet build apk --verbose --no-rich-output --compile-app --compile-packages --android-signing-key-store "$PWD/sign.jks" --android-signing-key-store-password "$KEYSTORE_PASSWORD" --android-signing-key-password "$KEYSTORE_PASSWORD" --android-signing-key-alias "$KEY_ALIAS" --build-version "$COMMIT_HASH" --yes
-        env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          poetry run flet build apk --verbose --no-rich-output --compile-app --compile-packages $SIGN_ARGS --build-version "$COMMIT_HASH" --yes
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -87,18 +92,23 @@ jobs:
           pip install poetry
           poetry install
 
-      - name: Decode keystore
+      - name: Decode keystore (optional)
         run: |
-          echo "$KEYSTORE_BASE64" | base64 --decode > sign.jks
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > sign.jks
+            echo "SIGN_ARGS=--android-signing-key-store $PWD/sign.jks --android-signing-key-store-password $KEYSTORE_PASSWORD --android-signing-key-password $KEYSTORE_PASSWORD --android-signing-key-alias $KEY_ALIAS" >> "$GITHUB_ENV"
+          else
+            echo "KEYSTORE_BASE64 is not set - the AAB will be debug-signed (not release-signed)."
+            echo "SIGN_ARGS=" >> "$GITHUB_ENV"
+          fi
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
 
       - name: Build AAB
         run: |
-          poetry run flet build aab --verbose --no-rich-output --compile-app --compile-packages --android-signing-key-store "$PWD/sign.jks" --android-signing-key-store-password "$KEYSTORE_PASSWORD" --android-signing-key-password "$KEYSTORE_PASSWORD" --android-signing-key-alias "$KEY_ALIAS" --build-version "$COMMIT_HASH" --yes
-        env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          poetry run flet build aab --verbose --no-rich-output --compile-app --compile-packages $SIGN_ARGS --build-version "$COMMIT_HASH" --yes
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4
@@ -313,6 +323,8 @@ jobs:
 
   deploy:
     needs: build-web  # wait for the "build" job to get done before executing this "deploy" job
+    # GitHub Pages is only configured on the upstream repository.
+    if: github.repository == 'AvianJay/DCTWFlet'
 
     runs-on: ubuntu-latest
 

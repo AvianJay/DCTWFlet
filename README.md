@@ -11,7 +11,7 @@
 [Web](https://nightly.link/AvianJay/DCTWFlet/workflows/build/main/DCTWFlet-web.zip)
 
 ## 計畫列表
-- [ ] API Key 登入
+- [x] API Key 設定
 - [x] 主題選擇
 - [ ] 搜尋功能
 - [x] 排序功能
@@ -45,6 +45,17 @@
     - [ ] 留言
     - [ ] 作者
     - [ ] 社群連結
+
+## API Key
+
+DCTW API v2 的所有請求都需要 API Key，取得方式：
+
+1. 在 [DCTW 官網](https://dctw.xyz) 使用 Discord 登入
+2. 進入後台，點擊「複製 API KEY」
+3. 打開應用程式的「設定」，點擊「從剪貼簿貼上 API Key」
+
+也可以手動在設定頁面輸入 API Key（會先向 API 驗證後才儲存）。
+官方說明：[取得 API KEY](https://dctw.xyz/docs/api-key)
 
 ## 直接從原代碼執行
 
