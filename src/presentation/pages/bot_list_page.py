@@ -4,7 +4,6 @@ Display list with filtering and sorting support
 """
 
 import flet as ft
-import asyncio
 from typing import Optional
 
 from application.services import DiscoveryService, PreferenceService
@@ -17,6 +16,7 @@ from infrastructure.api import ApiKeyMissingError, InvalidApiKeyError
 from infrastructure.config.constants import DEFAULT_AVATAR_URL
 from infrastructure.di import get_container
 from presentation.tag_mappings import BOT_TAGS
+from presentation.url_helper import open_url
 
 
 class BotListPage:
@@ -33,7 +33,13 @@ class BotListPage:
         )
 
         # UI組件
-        self.bot_list = ft.ListView(spacing=10, padding=20, expand=True)
+        self.bot_list = ft.ListView(
+            spacing=10,
+            padding=20,
+            expand=True,
+            scroll_interval=150,
+            on_scroll=self._on_list_scroll,
+        )
         self.search_field = ft.TextField(
             label="搜尋機器人...",
             prefix_icon=ft.Icons.SEARCH,
@@ -54,6 +60,18 @@ class BotListPage:
         self.progress = ft.ProgressBar(visible=False)
 
         self._current_filter: Optional[FilterCriteria] = None
+        self._items: list[Bot] = []
+        self._rendered_count = 0
+        self._page_size = 30
+        self._more_button = ft.Container(
+            content=ft.TextButton(
+                "顯示更多",
+                icon=ft.Icons.EXPAND_MORE,
+                on_click=lambda _: self._show_more(),
+            ),
+            alignment=ft.Alignment(0, 0),
+            padding=ft.padding.only(bottom=10),
+        )
 
     def build(self) -> ft.Control:
         """Build page UI"""
@@ -132,10 +150,12 @@ class BotListPage:
             self.page.update()
 
     def _render_bot_list(self, bots: list[Bot]):
-        """Render list"""
+        """Render the first page of the list"""
+        self._items = list(bots)
+        self._rendered_count = 0
         self.bot_list.controls.clear()
 
-        if not bots:
+        if not self._items:
             self.bot_list.controls.append(
                 ft.Container(
                     content=ft.Text("找不到機器人 :(", size=16, color=ft.Colors.GREY),
@@ -144,13 +164,41 @@ class BotListPage:
                 )
             )
         else:
-            for bot in bots:
-                self.bot_list.controls.append(self._create_bot_card(bot))
+            self._append_bot_page()
 
         self.page.update()
 
+    def _append_bot_page(self):
+        """Append the next page of bots to the list"""
+        end = min(self._rendered_count + self._page_size, len(self._items))
+        for bot in self._items[self._rendered_count : end]:
+            self.bot_list.controls.append(self._create_bot_card(bot))
+        self._rendered_count = end
+
+        if self._more_button in self.bot_list.controls:
+            self.bot_list.controls.remove(self._more_button)
+        if self._rendered_count < len(self._items):
+            self.bot_list.controls.append(self._more_button)
+
+    def _show_more(self):
+        """Show the next page of bots"""
+        self._append_bot_page()
+        self.bot_list.update()
+
+    def _on_list_scroll(self, e: ft.OnScrollEvent):
+        """Load the next page when the list is scrolled to the bottom"""
+        if not self._items or self._rendered_count >= len(self._items):
+            return
+
+        max_extent = e.max_scroll_extent or 0
+        if max_extent and e.pixels >= max_extent - 300:
+            self._append_bot_page()
+            self.bot_list.update()
+
     def _render_message(self, message: str):
         """Render a status message in place of the list"""
+        self._items = []
+        self._rendered_count = 0
         self.bot_list.controls.clear()
         self.bot_list.controls.append(
             ft.Container(
@@ -294,13 +342,13 @@ class BotListPage:
                                 ft.OutlinedButton(
                                     "邀請",
                                     icon=ft.Icons.ADD,
-                                    on_click=lambda _: self.page.launch_url(
-                                        bot.links.invite.value
+                                    on_click=lambda _, b=bot: open_url(
+                                        self.page, b.links.invite.value
                                     ),
                                 ),
                                 ft.OutlinedButton(
                                     "詳情",
-                                    on_click=lambda _, b=bot: asyncio.create_task(self._show_bot_detail(b)),
+                                    on_click=lambda _, b=bot: self._show_bot_detail(b),
                                 ),
                             ],
                             spacing=10,
@@ -312,8 +360,12 @@ class BotListPage:
             ),
         )
 
-    async def _show_bot_detail(self, bot: Bot):
+    def _show_bot_detail(self, bot: Bot):
         """Show details"""
+        self.page.run_task(self._navigate_to_bot_detail, bot)
+
+    async def _navigate_to_bot_detail(self, bot: Bot):
+        """Navigate to bot detail page"""
         await self.page.push_route(f"/bot/{bot.id}")
 
     async def _on_search(self):

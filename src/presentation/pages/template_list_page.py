@@ -16,6 +16,7 @@ from domain.discovery.entities import Template
 from infrastructure.api import ApiKeyMissingError, InvalidApiKeyError
 from infrastructure.di import get_container
 from presentation.tag_mappings import TEMPLATE_TAGS
+from presentation.url_helper import open_url
 
 
 class TemplateListPage:
@@ -32,7 +33,13 @@ class TemplateListPage:
         )
 
         # UI組件
-        self.template_list = ft.ListView(spacing=10, padding=20, expand=True)
+        self.template_list = ft.ListView(
+            spacing=10,
+            padding=20,
+            expand=True,
+            scroll_interval=150,
+            on_scroll=self._on_list_scroll,
+        )
         self.search_field = ft.TextField(
             label="搜尋模板...",
             prefix_icon=ft.Icons.SEARCH,
@@ -52,6 +59,18 @@ class TemplateListPage:
 
         self.progress = ft.ProgressBar(visible=False)
         self._current_filter: Optional[FilterCriteria] = None
+        self._items: list[Template] = []
+        self._rendered_count = 0
+        self._page_size = 30
+        self._more_button = ft.Container(
+            content=ft.TextButton(
+                "顯示更多",
+                icon=ft.Icons.EXPAND_MORE,
+                on_click=lambda _: self._show_more(),
+            ),
+            alignment=ft.Alignment(0, 0),
+            padding=ft.padding.only(bottom=10),
+        )
 
     def build(self) -> ft.Control:
         """Build page UI"""
@@ -131,10 +150,12 @@ class TemplateListPage:
             self.page.update()
 
     def _render_template_list(self, templates: list[Template]):
-        """Render list"""
+        """Render the first page of the list"""
+        self._items = list(templates)
+        self._rendered_count = 0
         self.template_list.controls.clear()
 
-        if not templates:
+        if not self._items:
             self.template_list.controls.append(
                 ft.Container(
                     content=ft.Text("找不到模板 :(", size=16, color=ft.Colors.GREY),
@@ -143,13 +164,41 @@ class TemplateListPage:
                 )
             )
         else:
-            for template in templates:
-                self.template_list.controls.append(self._create_template_card(template))
+            self._append_template_page()
 
         self.page.update()
 
+    def _append_template_page(self):
+        """Append the next page of templates to the list"""
+        end = min(self._rendered_count + self._page_size, len(self._items))
+        for template in self._items[self._rendered_count : end]:
+            self.template_list.controls.append(self._create_template_card(template))
+        self._rendered_count = end
+
+        if self._more_button in self.template_list.controls:
+            self.template_list.controls.remove(self._more_button)
+        if self._rendered_count < len(self._items):
+            self.template_list.controls.append(self._more_button)
+
+    def _show_more(self):
+        """Show the next page of templates"""
+        self._append_template_page()
+        self.template_list.update()
+
+    def _on_list_scroll(self, e: ft.OnScrollEvent):
+        """Load the next page when the list is scrolled to the bottom"""
+        if not self._items or self._rendered_count >= len(self._items):
+            return
+
+        max_extent = e.max_scroll_extent or 0
+        if max_extent and e.pixels >= max_extent - 300:
+            self._append_template_page()
+            self.template_list.update()
+
     def _render_message(self, message: str):
         """Render a status message in place of the list"""
+        self._items = []
+        self._rendered_count = 0
         self.template_list.controls.clear()
         self.template_list.controls.append(
             ft.Container(
@@ -249,8 +298,8 @@ class TemplateListPage:
                                 ft.ElevatedButton(
                                     "使用模板",
                                     icon=ft.Icons.ADD_TO_PHOTOS,
-                                    on_click=lambda _: self.page.launch_url(
-                                        template.links.share_url
+                                    on_click=lambda _, t=template: open_url(
+                                        self.page, t.links.share_url
                                     ),
                                 ),
                                 ft.OutlinedButton(
@@ -302,7 +351,9 @@ class TemplateListPage:
                 ft.TextButton("關閉", on_click=lambda _: self._close_dialog(dialog)),
                 ft.ElevatedButton(
                     "使用模板",
-                    on_click=lambda _: self.page.launch_url(template.links.share_url),
+                    on_click=lambda _, t=template: open_url(
+                        self.page, t.links.share_url
+                    ),
                 ),
             ],
         )

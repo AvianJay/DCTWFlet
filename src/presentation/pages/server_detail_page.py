@@ -10,6 +10,7 @@ from infrastructure.config.constants import DEFAULT_AVATAR_URL
 from infrastructure.di import get_container
 from infrastructure.image import ImageServer
 from presentation.tag_mappings import SERVER_TAGS
+from presentation.url_helper import open_url
 
 
 class ServerDetailPage:
@@ -137,7 +138,7 @@ class ServerDetailPage:
                     content=ft.Markdown(
                         self._convert_discord_emojis(server.introduce),
                         fit_content=False,
-                        on_tap_link=lambda e: self.page.launch_url(e.data),
+                        on_tap_link=lambda e: open_url(self.page, e.data),
                     ),
                     padding=ft.padding.all(20),
                 ),
@@ -147,8 +148,8 @@ class ServerDetailPage:
                         ft.ElevatedButton(
                             content=ft.Text("DCTW 伺服器頁面"),
                             icon=ft.Icons.OPEN_IN_NEW,
-                            on_click=lambda e: self.page.launch_url(
-                                f"https://dctw.xyz/servers/{server.id}"
+                            on_click=lambda e: open_url(
+                                self.page, f"https://dctw.xyz/servers/{server.id}"
                             ),
                         ),
                     ],
@@ -250,7 +251,7 @@ class ServerDetailPage:
                     ft.ElevatedButton(
                         icon=ft.Icons.ADD,
                         content=ft.Text("加入伺服器"),
-                        on_click=lambda e: self.page.launch_url(server.links.invite.value),
+                        on_click=lambda e: open_url(self.page, server.links.invite.value),
                     ),
                 ],
                 alignment=ft.MainAxisAlignment.CENTER,
@@ -270,7 +271,7 @@ class ServerDetailPage:
                     ft.ElevatedButton(
                         content=ft.Text("返回"),
                         icon=ft.Icons.ARROW_BACK,
-                        on_click=lambda e: asyncio.create_task(self.page.push_route("/")),
+                        on_click=lambda e: self.page.run_task(self.page.push_route, "/"),
                     ),
                 ],
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,

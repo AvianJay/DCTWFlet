@@ -7,6 +7,7 @@ from domain.discovery.entities import Template
 from domain.shared import EntityNotFoundException
 from infrastructure.di import get_container
 from presentation.tag_mappings import TEMPLATE_TAGS
+from presentation.url_helper import open_url
 
 
 class TemplateDetailPage:
@@ -103,8 +104,8 @@ class TemplateDetailPage:
                                 icon=ft.Icons.ADD,
                                 content=ft.Text("使用模板"),
                                 disabled=not template.links.share_url,
-                                on_click=lambda e: self.page.launch_url(
-                                    template.links.share_url
+                                on_click=lambda e: open_url(
+                                    self.page, template.links.share_url
                                 ),
                             ),
                         ],
@@ -120,7 +121,7 @@ class TemplateDetailPage:
                     content=ft.Markdown(
                         template.introduce,
                         fit_content=False,
-                        on_tap_link=lambda e: self.page.launch_url(e.data),
+                        on_tap_link=lambda e: open_url(self.page, e.data),
                     ),
                     padding=ft.padding.all(20),
                 ),
@@ -130,8 +131,8 @@ class TemplateDetailPage:
                         ft.ElevatedButton(
                             content=ft.Text("DCTW 模板頁面"),
                             icon=ft.Icons.OPEN_IN_NEW,
-                            on_click=lambda e: self.page.launch_url(
-                                f"https://dctw.xyz/templates/{template.id}"
+                            on_click=lambda e: open_url(
+                                self.page, f"https://dctw.xyz/templates/{template.id}"
                             ),
                         ),
                     ],
@@ -177,7 +178,7 @@ class TemplateDetailPage:
                     ft.ElevatedButton(
                         content=ft.Text("返回"),
                         icon=ft.Icons.ARROW_BACK,
-                        on_click=lambda e: asyncio.create_task(self.page.push_route("/")),
+                        on_click=lambda e: self.page.run_task(self.page.push_route, "/"),
                     ),
                 ],
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,

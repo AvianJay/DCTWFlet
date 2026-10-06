@@ -77,8 +77,10 @@ class SettingsPage:
                 # Title bar
                 ft.Container(
                     content=ft.Text("應用程式設定", size=20, weight=ft.FontWeight.BOLD),
-                    bgcolor=ft.Colors.SURFACE,
-                    padding=ft.padding.symmetric(horizontal=20, vertical=6),
+                    bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST,
+                    height=56,
+                    alignment=ft.Alignment(-1, 0),
+                    padding=ft.padding.only(left=16, right=16),
                 ),
                 # Settings items
                 ft.Container(

@@ -17,6 +17,7 @@ from infrastructure.api import ApiKeyMissingError, InvalidApiKeyError
 from infrastructure.config.constants import DEFAULT_AVATAR_URL
 from infrastructure.di import get_container
 from presentation.tag_mappings import SERVER_TAGS
+from presentation.url_helper import open_url
 
 
 class ServerListPage:
@@ -33,7 +34,13 @@ class ServerListPage:
         )
 
         # UI組件
-        self.server_list = ft.ListView(spacing=10, padding=20, expand=True)
+        self.server_list = ft.ListView(
+            spacing=10,
+            padding=20,
+            expand=True,
+            scroll_interval=150,
+            on_scroll=self._on_list_scroll,
+        )
         self.search_field = ft.TextField(
             label="搜尋伺服器...",
             prefix_icon=ft.Icons.SEARCH,
@@ -54,6 +61,18 @@ class ServerListPage:
 
         self.progress = ft.ProgressBar(visible=False)
         self._current_filter: Optional[FilterCriteria] = None
+        self._items: list[Server] = []
+        self._rendered_count = 0
+        self._page_size = 30
+        self._more_button = ft.Container(
+            content=ft.TextButton(
+                "顯示更多",
+                icon=ft.Icons.EXPAND_MORE,
+                on_click=lambda _: self._show_more(),
+            ),
+            alignment=ft.Alignment(0, 0),
+            padding=ft.padding.only(bottom=10),
+        )
 
     def build(self) -> ft.Control:
         """Build page UI"""
@@ -132,10 +151,12 @@ class ServerListPage:
             self.page.update()
 
     def _render_server_list(self, servers: list[Server]):
-        """Render list"""
+        """Render the first page of the list"""
+        self._items = list(servers)
+        self._rendered_count = 0
         self.server_list.controls.clear()
 
-        if not servers:
+        if not self._items:
             self.server_list.controls.append(
                 ft.Container(
                     content=ft.Text("找不到伺服器 :(", size=16, color=ft.Colors.GREY),
@@ -144,13 +165,41 @@ class ServerListPage:
                 )
             )
         else:
-            for server in servers:
-                self.server_list.controls.append(self._create_server_card(server))
+            self._append_server_page()
 
         self.page.update()
 
+    def _append_server_page(self):
+        """Append the next page of servers to the list"""
+        end = min(self._rendered_count + self._page_size, len(self._items))
+        for server in self._items[self._rendered_count : end]:
+            self.server_list.controls.append(self._create_server_card(server))
+        self._rendered_count = end
+
+        if self._more_button in self.server_list.controls:
+            self.server_list.controls.remove(self._more_button)
+        if self._rendered_count < len(self._items):
+            self.server_list.controls.append(self._more_button)
+
+    def _show_more(self):
+        """Show the next page of servers"""
+        self._append_server_page()
+        self.server_list.update()
+
+    def _on_list_scroll(self, e: ft.OnScrollEvent):
+        """Load the next page when the list is scrolled to the bottom"""
+        if not self._items or self._rendered_count >= len(self._items):
+            return
+
+        max_extent = e.max_scroll_extent or 0
+        if max_extent and e.pixels >= max_extent - 300:
+            self._append_server_page()
+            self.server_list.update()
+
     def _render_message(self, message: str):
         """Render a status message in place of the list"""
+        self._items = []
+        self._rendered_count = 0
         self.server_list.controls.clear()
         self.server_list.controls.append(
             ft.Container(
@@ -265,8 +314,8 @@ class ServerListPage:
                                 ft.ElevatedButton(
                                     "加入",
                                     icon=ft.Icons.LOGIN,
-                                    on_click=lambda _: self.page.launch_url(
-                                        server.links.invite.value
+                                    on_click=lambda _, s=server: open_url(
+                                        self.page, s.links.invite.value
                                     ),
                                 ),
                                 ft.OutlinedButton(
@@ -311,7 +360,9 @@ class ServerListPage:
                 ft.TextButton("關閉", on_click=lambda _: self._close_dialog(dialog)),
                 ft.ElevatedButton(
                     "加入",
-                    on_click=lambda _: self.page.launch_url(server.links.invite.value),
+                    on_click=lambda _, s=server: open_url(
+                        self.page, s.links.invite.value
+                    ),
                 ),
             ],
         )

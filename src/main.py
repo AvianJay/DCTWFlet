@@ -125,7 +125,7 @@ async def main(page: ft.Page):
 
     def navigate(route: str):
         if hasattr(page, "push_route"):
-            asyncio.create_task(page.push_route(route))
+            page.run_task(page.push_route, route)
         else:
             page.go(route)
 
@@ -173,77 +173,116 @@ async def main(page: ft.Page):
     # switch re-parented the same widgets and started competing background
     # tasks, which could leave the UI stuck on the previous tab.
     built_tabs: dict[int, ft.Control] = {}
-    content_container = ft.Container(expand=True)
+    tab_stack = ft.Stack(expand=True)
 
     def tab_content(index: int) -> ft.Control:
         """Return the content of a tab, building it on first use."""
-        if index not in built_tabs:
-            if index == 0:
-                built_tabs[index] = bot_page.build()
-            elif index == 1:
-                built_tabs[index] = server_page.build()
-            elif index == 2:
-                built_tabs[index] = template_page.build()
-            else:
-                built_tabs[index] = settings_page.build()
-        return built_tabs[index]
+        control = built_tabs.get(index)
+        if control is not None:
+            return control
+
+        if index == 0:
+            control = bot_page.build()
+        elif index == 1:
+            control = server_page.build()
+        elif index == 2:
+            control = template_page.build()
+        else:
+            control = settings_page.build()
+
+        control.visible = False
+        built_tabs[index] = control
+        tab_stack.controls.append(control)
+        return control
 
     def reload_data_tabs() -> None:
         """Rebuild the data tabs after the API key changed."""
         for index in (0, 1, 2):
-            built_tabs.pop(index, None)
-        if current_tab[0] in (0, 1, 2):
-            content_container.content = tab_content(current_tab[0])
-            page.update()
+            control = built_tabs.pop(index, None)
+            if control in tab_stack.controls:
+                tab_stack.controls.remove(control)
+        select_tab(current_tab[0])
+        page.update()
 
     settings_page = SettingsPage(page, on_data_changed=reload_data_tabs)
 
     def select_tab(index: int) -> None:
         current_tab[0] = index
         page.title = tab_titles[index]
-        content_container.content = tab_content(index)
+        tab_content(index)
+        for tab_index, control in built_tabs.items():
+            control.visible = tab_index == index
+        update_tab_colors()
 
-    def on_tab_changed(e):
-        """Tab change event handler"""
-        select_tab(e.control.selected_index)
-        page.update()
+    # Custom compact bottom bar (the Material one is always too tall).
+    tab_icons = (
+        (ft.Icons.SMART_TOY_OUTLINED, ft.Icons.SMART_TOY, "機器人"),
+        (ft.Icons.DNS_OUTLINED, ft.Icons.DNS, "伺服器"),
+        (ft.Icons.COPY_ALL_OUTLINED, ft.Icons.COPY_ALL, "模板"),
+        (ft.Icons.SETTINGS_OUTLINED, ft.Icons.SETTINGS, "設置"),
+    )
+    tab_controls: list[tuple[ft.Container, ft.Icon, ft.Text, ft.Icon, ft.Icon]] = []
 
-    navigation_bar = ft.NavigationBar(
-        destinations=[
-            ft.NavigationBarDestination(
-                icon=ft.Icons.SMART_TOY_OUTLINED,
-                selected_icon=ft.Icons.SMART_TOY,
-                label="機器人",
+    def update_tab_colors() -> None:
+        for index, (container, icon, label, icon_off, icon_on) in enumerate(
+            tab_controls
+        ):
+            is_selected = index == current_tab[0]
+            color = (
+                ft.Colors.ON_SECONDARY_CONTAINER
+                if is_selected
+                else ft.Colors.ON_SURFACE_VARIANT
+            )
+            container.bgcolor = ft.Colors.SECONDARY_CONTAINER if is_selected else None
+            icon.name = icon_on if is_selected else icon_off
+            icon.color = color
+            label.color = color
+
+    def create_tab_button(index: int) -> ft.Control:
+        icon_off, icon_on, text = tab_icons[index]
+        icon = ft.Icon(icon_off, size=21, color=ft.Colors.ON_SURFACE_VARIANT)
+        label = ft.Text(text, size=11, color=ft.Colors.ON_SURFACE_VARIANT)
+
+        def on_click(e, tab_index=index):
+            select_tab(tab_index)
+            page.update()
+
+        container = ft.Container(
+            content=ft.Column(
+                [icon, label],
+                spacing=1,
+                alignment=ft.MainAxisAlignment.CENTER,
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
             ),
-            ft.NavigationBarDestination(
-                icon=ft.Icons.DNS_OUTLINED,
-                selected_icon=ft.Icons.DNS,
-                label="伺服器",
-            ),
-            ft.NavigationBarDestination(
-                icon=ft.Icons.COPY_ALL_OUTLINED,
-                selected_icon=ft.Icons.COPY_ALL,
-                label="模板",
-            ),
-            ft.NavigationBarDestination(
-                icon=ft.Icons.SETTINGS_OUTLINED,
-                selected_icon=ft.Icons.SETTINGS,
-                label="設置",
-            ),
-        ],
-        selected_index=current_tab[0],
-        on_change=on_tab_changed,
+            expand=True,
+            height=38,
+            border_radius=10,
+            alignment=ft.Alignment(0, 0),
+            ink=True,
+            on_click=on_click,
+        )
+        tab_controls.append((container, icon, label, icon_off, icon_on))
+        return container
+
+    navigation_bar = ft.Container(
+        content=ft.Row(
+            [create_tab_button(index) for index in range(len(tab_icons))],
+            spacing=4,
+        ),
+        height=50,
+        padding=ft.padding.symmetric(horizontal=6, vertical=6),
+        bgcolor=ft.Colors.SURFACE_CONTAINER,
+        alignment=ft.Alignment(0, 0),
     )
 
     def create_home_view() -> ft.View:
-        navigation_bar.selected_index = current_tab[0]
         select_tab(current_tab[0])
 
         return ft.View(
             route="/",
             controls=[
                 ft.Column(
-                    [content_container, navigation_bar],
+                    [tab_stack, navigation_bar],
                     spacing=0,
                     expand=True,
                 )
@@ -389,7 +428,7 @@ async def main(page: ft.Page):
             except Exception:
                 logger.exception("Failed to show API key onboarding dialog")
 
-        asyncio.create_task(show_api_key_onboarding())
+        page.run_task(show_api_key_onboarding)
 
 
 if __name__ == "__main__":
