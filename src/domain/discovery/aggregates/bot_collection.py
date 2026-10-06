@@ -50,14 +50,12 @@ class BotCollection(AggregateRoot):
         return [bot for bot in self._bots if bot.matches_filter(criteria)]
 
     def sort_by(self, bots: List[Bot], option: SortOption) -> List[Bot]:
-        """Sort"""
-        if option == SortOption.NEWEST:
-            sorted_list = sorted(bots, key=lambda b: b.timestamps.created_at, reverse=True)
-        elif option == SortOption.VOTES:
+        """Sort - the same rules the DCTW website uses."""
+        if option == SortOption.MOST_VOTES:
             sorted_list = sorted(bots, key=lambda b: b.statistics.votes, reverse=True)
-        elif option == SortOption.SERVERS:
+        elif option == SortOption.MOST_SERVERS:
             sorted_list = sorted(bots, key=lambda b: b.statistics.servers, reverse=True)
-        elif option == SortOption.BUMPED:
+        elif option in (SortOption.MOST_ACTIVE, SortOption.DEFAULT):
             sorted_list = sorted(bots, key=lambda b: b.timestamps.bumped_at, reverse=True)
         else:
             sorted_list = bots

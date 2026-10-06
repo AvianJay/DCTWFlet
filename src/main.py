@@ -143,8 +143,8 @@ async def main(page: ft.Page):
         logger.error(str(e))
         page.theme_mode = ft.ThemeMode.SYSTEM
 
-    page.theme = ft.Theme(navigation_bar_theme=ft.NavigationBarTheme(height=80))
-    page.dark_theme = ft.Theme(navigation_bar_theme=ft.NavigationBarTheme(height=80))
+    page.theme = ft.Theme(navigation_bar_theme=ft.NavigationBarTheme(height=64))
+    page.dark_theme = ft.Theme(navigation_bar_theme=ft.NavigationBarTheme(height=64))
 
     image_server: ImageServer = container.resolve(ImageServer)
 
@@ -201,7 +201,7 @@ async def main(page: ft.Page):
                 ft.NavigationBarDestination(
                     icon=ft.Icons.COPY_ALL_OUTLINED,
                     selected_icon=ft.Icons.COPY_ALL,
-                    label="範本",
+                    label="模板",
                 ),
                 ft.NavigationBarDestination(
                     icon=ft.Icons.SETTINGS_OUTLINED,
@@ -274,7 +274,7 @@ async def main(page: ft.Page):
             route=f"/template/{template_id}",
             controls=[ft.Container(content=detail_page.build(), expand=True)],
             appbar=ft.AppBar(
-                title=ft.Text("範本詳情"),
+                title=ft.Text("模板詳情"),
                 bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST,
                 leading=ft.IconButton(
                     icon=ft.Icons.ARROW_BACK,

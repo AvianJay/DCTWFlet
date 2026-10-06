@@ -41,11 +41,11 @@ class TemplateListPage:
         self.sort_dropdown = ft.Dropdown(
             label="排序",
             options=[
-                ft.dropdown.Option("newest", "最新"),
-                ft.dropdown.Option("votes", "投票數"),
-                ft.dropdown.Option("bumped", "最近置頂"),
+                ft.dropdown.Option("default", "預設排序"),
+                ft.dropdown.Option("mostVotes", "最多投票"),
+                ft.dropdown.Option("mostActive", "最高活躍度"),
             ],
-            value="bumped",
+            value="default",
             width=150,
             on_select=lambda _: self.page.run_task(self._load_templates),
         )
@@ -208,6 +208,7 @@ class TemplateListPage:
                                                     template.name,
                                                     size=18,
                                                     weight=ft.FontWeight.BOLD,
+                                                    expand=True,
                                                     max_lines=1,
                                                     overflow=ft.TextOverflow.ELLIPSIS,
                                                 ),

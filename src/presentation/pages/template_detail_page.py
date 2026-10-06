@@ -102,7 +102,10 @@ class TemplateDetailPage:
                             ft.ElevatedButton(
                                 icon=ft.Icons.ADD,
                                 content=ft.Text("使用模板"),
-                                on_click=lambda e: self.page.launch_url(template.links.share_url.value),
+                                disabled=not template.links.share_url,
+                                on_click=lambda e: self.page.launch_url(
+                                    template.links.share_url
+                                ),
                             ),
                         ],
                         alignment=ft.MainAxisAlignment.CENTER,

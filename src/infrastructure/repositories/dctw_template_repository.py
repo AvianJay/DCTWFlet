@@ -1,7 +1,6 @@
 """DCTW Template repository implementation"""
 
 from typing import List, Optional
-from datetime import datetime, timezone
 import logging
 
 from domain.discovery.repositories import TemplateRepository
@@ -13,6 +12,7 @@ from domain.discovery.value_objects import (
 )
 from ..api import DctwApiClient
 from ..cache import CacheManager
+from .api_helpers import normalize_url, parse_datetime
 
 logger = logging.getLogger(__name__)
 
@@ -63,12 +63,9 @@ class DctwTemplateRepository(TemplateRepository):
         if not data.get("created_at"):
             data["created_at"] = "1999-01-01T00:00:00Z"
 
-        share_url = (
-            data.get("shareLink")
-            or data.get("url")
-            or data.get("share_url")
-            or ""
-        ).strip()
+        share_url = normalize_url(
+            data.get("shareLink") or data.get("url") or data.get("share_url")
+        )
 
         return Template(
             id=int(data["id"]),
@@ -86,10 +83,10 @@ class DctwTemplateRepository(TemplateRepository):
             ],
             links=TemplateLinks(share_url=share_url),
             timestamps=Timestamps(
-                created_at=self._parse_datetime(
+                created_at=parse_datetime(
                     data.get("created_at", "1999-01-01T00:00:00Z")
                 ),
-                bumped_at=self._parse_datetime(
+                bumped_at=parse_datetime(
                     data.get("bumped_at", "1999-01-01T00:00:00Z")
                 ),
             ),
@@ -114,20 +111,3 @@ class DctwTemplateRepository(TemplateRepository):
     def _deserialize_template(self, data: dict) -> Template:
         """Deserialize Template from cache"""
         return self._map_to_domain(data)
-
-    @staticmethod
-    def _parse_datetime(value) -> datetime:
-        """Parse date and time"""
-        if isinstance(value, datetime):
-            return value
-        if isinstance(value, (int, float)):
-            try:
-                return datetime.fromtimestamp(value, timezone.utc)
-            except:
-                pass
-        if isinstance(value, str):
-            try:
-                return datetime.fromisoformat(value).astimezone(timezone.utc)
-            except:
-                pass
-        return datetime.now(timezone.utc)

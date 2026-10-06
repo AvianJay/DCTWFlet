@@ -12,7 +12,7 @@ from infrastructure.api import DctwApiClient
 from infrastructure.di import get_container
 
 from application.services import DiscoveryService
-from presentation.components import ApiKeyDialog
+from presentation.components import ApiKeyDialog, Toast
 
 
 class SettingsPage:
@@ -26,6 +26,7 @@ class SettingsPage:
             DiscoveryService
         )
         self.api_client: DctwApiClient = self.container.resolve(DctwApiClient)
+        self.toast = Toast(self.page)
 
         # UI組件
         self.theme_dropdown = ft.Dropdown(
@@ -291,13 +292,8 @@ class SettingsPage:
             self._show_error(f"Clear cache失敗: {str(e)}")
 
     def _show_success(self, message: str):
-        """Show success message"""
-        self.page.show_dialog(
-            ft.SnackBar(
-                content=ft.Text(message),
-                bgcolor=ft.Colors.GREEN,
-            )
-        )
+        """Show a small message at the bottom of the page"""
+        self.toast.show(message)
 
     def _show_error(self, message: str):
         """Show error message"""

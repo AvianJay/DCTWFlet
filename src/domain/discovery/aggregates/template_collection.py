@@ -48,14 +48,10 @@ class TemplateCollection(AggregateRoot):
         return [t for t in self._templates if t.matches_filter(criteria)]
 
     def sort_by(self, templates: List[Template], option: SortOption) -> List[Template]:
-        """Sort"""
-        if option == SortOption.NEWEST:
-            sorted_list = sorted(
-                templates, key=lambda t: t.timestamps.created_at, reverse=True
-            )
-        elif option == SortOption.VOTES:
+        """Sort - the same rules the DCTW website uses."""
+        if option == SortOption.MOST_VOTES:
             sorted_list = sorted(templates, key=lambda t: t.statistics.votes, reverse=True)
-        elif option == SortOption.BUMPED:
+        elif option in (SortOption.MOST_ACTIVE, SortOption.DEFAULT):
             sorted_list = sorted(templates, key=lambda t: t.timestamps.bumped_at, reverse=True)
         else:
             sorted_list = templates

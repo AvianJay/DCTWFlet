@@ -37,7 +37,7 @@ class DiscoveryService:
     async def list_bots(
         self,
         filter_criteria: FilterCriteria = None,
-        sort_option: SortOption = SortOption.NEWEST,
+        sort_option: SortOption = SortOption.DEFAULT,
     ) -> List[Bot]:
         """
         List Bots
@@ -91,7 +91,7 @@ class DiscoveryService:
     async def list_servers(
         self,
         filter_criteria: FilterCriteria = None,
-        sort_option: SortOption = SortOption.NEWEST,
+        sort_option: SortOption = SortOption.DEFAULT,
     ) -> List[Server]:
         """List servers"""
         logger.info(
@@ -126,7 +126,7 @@ class DiscoveryService:
     async def list_templates(
         self,
         filter_criteria: FilterCriteria = None,
-        sort_option: SortOption = SortOption.NEWEST,
+        sort_option: SortOption = SortOption.DEFAULT,
     ) -> List[Template]:
         """List templates"""
         logger.info(

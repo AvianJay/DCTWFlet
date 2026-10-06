@@ -1,7 +1,6 @@
 """DCTW Bot repository implementation"""
 
 from typing import List, Optional
-from datetime import datetime, timezone
 import logging
 
 from domain.discovery.repositories import BotRepository
@@ -17,6 +16,12 @@ from domain.discovery.value_objects import (
 )
 from ..api import DctwApiClient
 from ..cache import CacheManager
+from .api_helpers import (
+    FALLBACK_AVATAR_URL,
+    normalize_optional_url,
+    normalize_url,
+    parse_datetime,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -67,19 +72,19 @@ class DctwBotRepository(BotRepository):
             name = f"Bot {bot_id}"
             logger.warning(f"Bot {bot_id} has empty name, using fallback")
 
-        avatar_url = (data.get("avatar") or data.get("avatar_url") or "").strip()
+        avatar_url = normalize_url(
+            data.get("avatar") or data.get("avatar_url"),
+            FALLBACK_AVATAR_URL,
+        )
 
-        if not avatar_url:
-            avatar_url = "https://cdn.discordapp.com/embed/avatars/0.png"
+        invite_url = normalize_url(
+            data.get("inviteLink") or data.get("url") or data.get("invite_url"),
+            "https://discord.com/oauth2/authorize?client_id=0",
+        )
 
-        invite_url = (
-            data.get("inviteLink") or data.get("url") or data.get("invite_url") or ""
-        ).strip()
-
-        if not invite_url:
-            invite_url = "https://discord.com/oauth2/authorize?client_id=0"
-
-        banner_url = (data.get("banner") or data.get("banner_url") or "").strip()
+        banner_url = normalize_optional_url(
+            data.get("banner") or data.get("banner_url")
+        )
 
         if not data.get("bumped_at"):
             data["bumped_at"] = "1999-01-01T00:00:00Z"
@@ -116,24 +121,26 @@ class DctwBotRepository(BotRepository):
             ],
             links=BotLinks(
                 invite=InviteUrl(invite_url),
-                support_server=data.get("serverLink")
-                or data.get("discord_url")
-                or data.get("server_url"),
-                website=data.get("webLink")
-                or data.get("website_url")
-                or data.get("web_url"),
+                support_server=normalize_optional_url(
+                    data.get("serverLink")
+                    or data.get("discord_url")
+                    or data.get("server_url")
+                ),
+                website=normalize_optional_url(
+                    data.get("webLink")
+                    or data.get("website_url")
+                    or data.get("web_url")
+                ),
             ),
             timestamps=Timestamps(
-                created_at=self._parse_datetime(
+                created_at=parse_datetime(
                     data.get("created_at", "1999-01-01T00:00:00Z")
                 ),
-                bumped_at=self._parse_datetime(
+                bumped_at=parse_datetime(
                     data.get("bumped_at", "1999-01-01T00:00:00Z")
                 ),
             ),
-            banner=(
-                BannerUrl(banner_url) if banner_url else None
-            ),
+            banner=BannerUrl(banner_url) if banner_url else None,
             pinned=data.get("pinned", False),
         )
 
@@ -164,20 +171,3 @@ class DctwBotRepository(BotRepository):
     def _deserialize_bot(self, data: dict) -> Bot:
         """Deserialize Bot from cache"""
         return self._map_to_domain(data)
-
-    @staticmethod
-    def _parse_datetime(value) -> datetime:
-        """Parse date and time"""
-        if isinstance(value, datetime):
-            return value
-        if isinstance(value, (int, float)):
-            try:
-                return datetime.fromtimestamp(value, timezone.utc)
-            except:
-                pass
-        if isinstance(value, str):
-            try:
-                return datetime.fromisoformat(value).astimezone(timezone.utc)
-            except:
-                pass
-        return datetime.now(timezone.utc)
