@@ -1,10 +1,11 @@
 """DCTW Bot repository implementation"""
 
-from typing import List, Optional
+import asyncio
+from typing import Dict, List, Optional
 import logging
 
 from domain.discovery.repositories import BotRepository
-from domain.discovery.entities import Bot, BotLinks
+from domain.discovery.entities import Bot, BotAuthor, BotDetails, BotLinks
 from domain.discovery.value_objects import (
     BotTag,
     ContentStatus,
@@ -21,6 +22,7 @@ from .api_helpers import (
     is_listed_bot,
     normalize_optional_url,
     normalize_url,
+    parse_author_ids,
     parse_datetime,
     parse_tag_list,
     to_bool,
@@ -33,6 +35,8 @@ class DctwBotRepository(BotRepository):
     """DCTW API-based Bot repository implementation"""
 
     CACHE_KEY = "bots:all"
+    PARTNER_CACHE_PREFIX = "bots:partner:"
+    USER_CACHE_PREFIX = "users:profile:"
 
     def __init__(self, api_client: DctwApiClient, cache_manager: CacheManager):
         self._api_client = api_client
@@ -78,6 +82,99 @@ class DctwBotRepository(BotRepository):
 
         return None
 
+    async def find_details(
+        self, bot_id: int, author_ids: Optional[List[str]] = None
+    ) -> BotDetails:
+        """Authors and partner flag shown on the official bot page.
+
+        Both requests run in parallel so a detail page can refresh its
+        badges right after the (cached) bot data is on screen.
+        """
+        is_partnered, authors = await asyncio.gather(
+            self._load_partner_status(bot_id),
+            self._load_authors(bot_id, list(author_ids or [])),
+        )
+
+        return BotDetails(is_partnered=is_partnered, authors=authors)
+
+    async def _load_partner_status(self, bot_id: int) -> bool:
+        """Read the partner flag from the single bot endpoint."""
+        cache_key = f"{self.PARTNER_CACHE_PREFIX}{bot_id}"
+        cached = await self._cache.get(cache_key)
+        if isinstance(cached, bool):
+            return cached
+
+        try:
+            data = await self._api_client.get_bot_flags(bot_id)
+        except Exception as error:
+            logger.warning(f"Failed to load partner status of bot {bot_id}: {error}")
+            return False
+
+        if data is None:
+            # Older API revisions expose the flag on the bot record itself.
+            try:
+                data = await self._api_client.get_bot(bot_id)
+            except Exception as error:
+                logger.warning(
+                    f"Failed to load partner status of bot {bot_id}: {error}"
+                )
+                return False
+
+        if data is None:
+            return False
+
+        is_partnered = (
+            to_bool(data.get("partnered"))
+            or to_bool(data.get("partner"))
+            or to_bool(data.get("is_partnered", False))
+        )
+        await self._cache.set(cache_key, is_partnered, ttl=600)
+        return is_partnered
+
+    async def _load_authors(
+        self, bot_id: int, author_ids: List[str]
+    ) -> List[BotAuthor]:
+        """Resolve the Discord author ids to names and avatars."""
+        if not author_ids:
+            return []
+
+        profiles: Dict[str, dict] = {}
+        missing: List[str] = []
+        for author_id in author_ids:
+            if author_id in profiles or author_id in missing:
+                continue
+            cached = await self._cache.get(f"{self.USER_CACHE_PREFIX}{author_id}")
+            if isinstance(cached, dict) and cached.get("name"):
+                profiles[author_id] = cached
+            else:
+                missing.append(author_id)
+
+        if missing:
+            for profile in await self._api_client.get_user_profiles(missing, bot_id):
+                profile_id = str(profile.get("id") or "").strip()
+                if not profile_id:
+                    continue
+                profiles[profile_id] = profile
+                await self._cache.set(
+                    f"{self.USER_CACHE_PREFIX}{profile_id}", profile, ttl=3600
+                )
+
+        authors: List[BotAuthor] = []
+        for author_id in author_ids:
+            profile = profiles.get(author_id)
+            name = str((profile or {}).get("name") or "").strip()
+            if not name:
+                continue
+            authors.append(
+                BotAuthor(
+                    id=author_id,
+                    name=name,
+                    avatar_url=(profile or {}).get("avatar_url"),
+                )
+            )
+
+        return authors
+
     async def clear_cache(self) -> None:
         """Clear cache"""
         await self._cache.delete(self.CACHE_KEY)
@@ -105,6 +202,16 @@ class DctwBotRepository(BotRepository):
         banner_url = normalize_optional_url(
             data.get("banner") or data.get("banner_url")
         )
+
+        cached_author_ids = data.get("author_ids")
+        if isinstance(cached_author_ids, list):
+            author_ids = [
+                str(value).strip()
+                for value in cached_author_ids
+                if str(value).strip()
+            ]
+        else:
+            author_ids = parse_author_ids(data)
 
         if not data.get("bumped_at"):
             data["bumped_at"] = "1999-01-01T00:00:00Z"
@@ -166,6 +273,7 @@ class DctwBotRepository(BotRepository):
             ),
             banner=BannerUrl(banner_url) if banner_url else None,
             pinned=to_bool(data.get("pinned", False)),
+            author_ids=author_ids,
         )
 
     def _serialize_bot(self, bot: Bot) -> dict:
@@ -187,6 +295,7 @@ class DctwBotRepository(BotRepository):
             "invite_url": bot.links.invite.value,
             "server_url": bot.links.support_server,
             "web_url": bot.links.website,
+            "author_ids": bot.author_ids,
             "created_at": bot.timestamps.created_at.isoformat(),
             "bumped_at": bot.timestamps.bumped_at.isoformat(),
             "pinned": bot.pinned,

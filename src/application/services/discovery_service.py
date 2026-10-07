@@ -1,6 +1,6 @@
 """Discovery service"""
 
-from typing import List
+from typing import List, Optional
 import logging
 
 from domain.discovery.repositories import (
@@ -8,7 +8,7 @@ from domain.discovery.repositories import (
     ServerRepository,
     TemplateRepository,
 )
-from domain.discovery.entities import Bot, Server, Template
+from domain.discovery.entities import Bot, BotDetails, Server, Template
 from domain.discovery.value_objects import FilterCriteria, SortOption
 from domain.discovery.aggregates import (
     BotCollection,
@@ -87,6 +87,12 @@ class DiscoveryService:
             raise EntityNotFoundException("Bot", bot_id)
 
         return bot
+
+    async def get_bot_details(
+        self, bot_id: int, author_ids: Optional[List[str]] = None
+    ) -> BotDetails:
+        """Authors and partner flag shown on the official bot page."""
+        return await self._bot_repo.find_details(bot_id, author_ids or [])
 
     async def list_servers(
         self,

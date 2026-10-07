@@ -1,7 +1,9 @@
 """DCTW API client (API v2)"""
 
 from typing import List, Dict, Any, Optional
+import json
 import logging
+import re
 import httpx
 
 from domain.preferences.value_objects import ApiKey
@@ -35,6 +37,15 @@ class DctwApiClient:
     DEFAULT_BASE_URL = DCTW_API_BASE_URL
     DEFAULT_API_PREFIX = DCTW_API_VERSION_PREFIX
     MAX_PAGES = 50
+
+    # Server action used by the official website to resolve Discord user ids
+    # (bot authors) to their public profile.
+    GET_USERS_ACTION = "40d2eecba887e6edbe579ce1858b12b97b66aa318d"
+
+    # Server action used by the official website to read a single bot record
+    # (the public API does not expose the partner flag).
+    GET_BOT_ACTION = "601cebfbdd90674fa83db025737892d230455e1ffb"
+    BOT_DETAIL_FIELDS = ["id", "partner", "slash", "author", "devs"]
 
     def __init__(
         self,
@@ -73,6 +84,72 @@ class DctwApiClient:
     async def get_bot(self, bot_id: int) -> Optional[Dict[str, Any]]:
         """Get a single bot by ID. Returns None when the API answers 404."""
         return await self._get_item(f"/bots/{bot_id}/")
+
+    async def get_user_profiles(
+        self, user_ids: List[str], page_bot_id: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """Resolve Discord user ids to their public profile.
+
+        The public API only exposes author ids, so the names and avatars are
+        read from the same server action the official website uses. Failures
+        are swallowed: a bot page stays usable without the author block.
+        """
+        ids = [str(user_id).strip() for user_id in user_ids if str(user_id).strip()]
+        if not ids:
+            return []
+
+        endpoint = f"/bots/{page_bot_id}" if page_bot_id else "/bots"
+        headers = {
+            "Next-Action": self.GET_USERS_ACTION,
+            "Content-Type": "text/plain;charset=UTF-8",
+            "Accept": "text/x-component",
+            "Origin": self._base_url,
+            "Referer": f"{self._base_url}{endpoint}",
+        }
+
+        try:
+            async with AsyncHttpClient(
+                self._base_url, headers={"User-Agent": self._user_agent}
+            ) as client:
+                payload = await client.post_text(
+                    endpoint, json.dumps([ids]), headers=headers
+                )
+        except Exception as error:
+            logger.warning(f"Failed to load Discord user profiles: {error}")
+            return []
+
+        return self._parse_user_profiles(payload)
+
+    async def get_bot_flags(self, bot_id: int) -> Optional[Dict[str, Any]]:
+        """Read one bot record from the official website detail page.
+
+        Used for the fields the public API does not return (partner flag).
+        """
+        endpoint = f"/bots/{bot_id}"
+        headers = {
+            "Next-Action": self.GET_BOT_ACTION,
+            "Content-Type": "text/plain;charset=UTF-8",
+            "Accept": "text/x-component",
+            "Origin": self._base_url,
+            "Referer": f"{self._base_url}{endpoint}",
+        }
+
+        try:
+            async with AsyncHttpClient(
+                self._base_url, headers={"User-Agent": self._user_agent}
+            ) as client:
+                payload = await client.post_text(
+                    endpoint,
+                    json.dumps([str(bot_id), list(self.BOT_DETAIL_FIELDS)]),
+                    headers=headers,
+                )
+        except Exception as error:
+            logger.warning(f"Failed to load bot flags for {bot_id}: {error}")
+            return None
+
+        data = self._extract_action_payload(payload)
+        item = data.get("item") if isinstance(data, dict) else None
+        return item if isinstance(item, dict) else None
 
     async def get_servers(self) -> List[Dict[str, Any]]:
         """Get all servers."""
@@ -256,6 +333,72 @@ class DctwApiClient:
                 if isinstance(value, str) and value:
                     return value
         return None
+
+    @classmethod
+    def _parse_user_profiles(cls, payload: str) -> List[Dict[str, Any]]:
+        """Read the profiles out of the server action response."""
+        data = cls._extract_action_payload(payload)
+        if not isinstance(data, list):
+            return []
+
+        profiles: List[Dict[str, Any]] = []
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+
+            user_id = str(item.get("id") or "").strip()
+            if not user_id:
+                continue
+
+            name = str(item.get("global_name") or item.get("username") or "").strip()
+            profiles.append(
+                {
+                    "id": user_id,
+                    "name": name or user_id,
+                    "avatar_url": cls._build_user_avatar_url(
+                        user_id, item.get("avatar")
+                    ),
+                }
+            )
+
+        return profiles
+
+    @staticmethod
+    def _build_user_avatar_url(user_id: str, avatar_hash: Optional[str]) -> str:
+        """Build the Discord avatar URL exactly like the official website."""
+        if avatar_hash:
+            return (
+                f"https://cdn.discordapp.com/avatars/{user_id}/"
+                f"{avatar_hash}.png?size=64"
+            )
+
+        try:
+            index = int(user_id[-5:]) % 6
+        except ValueError:
+            index = 0
+        return f"https://cdn.discordapp.com/embed/avatars/{index}.png"
+
+    @staticmethod
+    def _extract_action_payload(payload: str):
+        """Read the JSON result out of a React flight (RSC) response body."""
+        decoder = json.JSONDecoder()
+        results = []
+
+        for match in re.finditer(r"(?:^|\s)(\d+):", payload or ""):
+            try:
+                value, _ = decoder.raw_decode(payload, match.end())
+            except ValueError:
+                continue
+            results.append((int(match.group(1)), value))
+
+        if not results:
+            return None
+
+        lists = [value for _, value in results if isinstance(value, list)]
+        if lists:
+            return lists[-1]
+
+        return results[-1][1]
 
     @staticmethod
     def _normalize_path_prefix(value: str) -> str:

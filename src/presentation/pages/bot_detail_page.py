@@ -1,15 +1,18 @@
 import flet as ft
 import re
 import asyncio
-from typing import Optional
+import logging
+from typing import List, Optional
 from application.services import DiscoveryService
-from domain.discovery.entities import Bot
+from domain.discovery.entities import Bot, BotAuthor
 from domain.shared import EntityNotFoundException
 from infrastructure.di import get_container
 from infrastructure.image import ImageServer
 from presentation.components import build_avatar
 from presentation.tag_mappings import BOT_TAGS
 from presentation.url_helper import open_url
+
+logger = logging.getLogger(__name__)
 
 
 class BotDetailPage:
@@ -25,6 +28,8 @@ class BotDetailPage:
         )
         self.image_server: ImageServer = self.container.resolve(ImageServer)
         self._bot: Optional[Bot] = None
+        self._badges_container: Optional[ft.Container] = None
+        self._author_container: Optional[ft.Container] = None
 
     def _get_tag_info(self, tag_name: str) -> tuple[str, str]:
         """Get tag display name and icon"""
@@ -114,6 +119,7 @@ class BotDetailPage:
             bot_id_int = int(self.bot_id)
             self._bot = await self.discovery_service.get_bot_by_id(bot_id_int)
             self._render_bot_detail()
+            self.page.run_task(self._load_bot_details)
 
         except EntityNotFoundException as e:
             self._show_error(f"找不到此機器人 (ID: {self.bot_id})")
@@ -132,12 +138,23 @@ class BotDetailPage:
 
         bot = self._bot
 
+        # The author block and the partner badge come from the official
+        # detail page, so they are refreshed once that data arrives.
+        self._badges_container = ft.Container(
+            content=self._create_badges_section(bot),
+            alignment=ft.Alignment(0, 0),
+        )
+        self._author_container = ft.Container()
+
         # Create detail view
 
         detail_view = ft.Column(
             [
                 # Banner and Avatar
                 self._create_header_section(bot),
+                # Authors (avatars + name), right under the avatar like the
+                # official page
+                self._author_container,
                 # Name
                 ft.Row(
                     [
@@ -152,7 +169,7 @@ class BotDetailPage:
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 ),
                 # Badges (Verified, Partner)
-                self._create_badges_section(bot),
+                self._badges_container,
                 # Description
                 ft.Container(
                     content=ft.Text(
@@ -264,10 +281,13 @@ class BotDetailPage:
             height=256 + 64,
         )
 
-    def _create_badges_section(self, bot: Bot) -> ft.Control:
+    def _create_badges_section(
+        self, bot: Bot, is_partnered: Optional[bool] = None
+    ) -> ft.Control:
         """Create badges section (verified, partner)"""
 
         badges = []
+        partnered = bot.is_partnered if is_partnered is None else is_partnered
 
         if bot.verified:
             badges.append(
@@ -283,7 +303,7 @@ class BotDetailPage:
                 )
             )
 
-        if bot.is_partnered:
+        if partnered:
             badges.append(
                 ft.ElevatedButton(
                     content="DCTW 合作夥伴",
@@ -305,6 +325,78 @@ class BotDetailPage:
             alignment=ft.MainAxisAlignment.CENTER,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
         )
+
+    def _create_authors_section(self, authors: List[BotAuthor]) -> ft.Control:
+        """Create the author row (avatar(s) + name) of the official page."""
+        if not authors:
+            return ft.Container(height=0)
+
+        avatars = [
+            build_avatar(
+                self._cache_image(author.avatar_url) if author.avatar_url else "",
+                radius=12,
+            )
+            for author in authors[:3]
+        ]
+        names = "、".join(author.name for author in authors if author.name)
+        if not names:
+            return ft.Container(height=0)
+
+        if len(names) > 24:
+            names = names[:23] + "\u2026"
+
+        row_controls = [ft.Text("作者", size=12, color=ft.Colors.OUTLINE)]
+        row_controls.extend(avatars)
+        row_controls.append(
+            ft.Text(
+                names,
+                size=13,
+                weight=ft.FontWeight.BOLD,
+                color=ft.Colors.OUTLINE,
+            )
+        )
+
+        return ft.Container(
+            content=ft.Row(
+                row_controls,
+                alignment=ft.MainAxisAlignment.CENTER,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=4,
+            ),
+            alignment=ft.Alignment(0, 0),
+            padding=ft.padding.symmetric(horizontal=20),
+        )
+
+    async def _load_bot_details(self) -> None:
+        """Refresh the badge row and show the author row of the website."""
+        bot = self._bot
+        if bot is None:
+            return
+
+        try:
+            details = await self.discovery_service.get_bot_details(
+                bot.id, bot.author_ids
+            )
+        except Exception as error:
+            logger.warning(f"Failed to load bot details for {bot.id}: {error}")
+            return
+
+        try:
+            if details.authors and self._author_container is not None:
+                self._author_container.content = self._create_authors_section(
+                    details.authors
+                )
+            if (
+                details.is_partnered
+                and not bot.is_partnered
+                and self._badges_container is not None
+            ):
+                self._badges_container.content = self._create_badges_section(
+                    bot, is_partnered=True
+                )
+            self.page.update()
+        except Exception:
+            logger.debug("Bot detail page closed before the extra data arrived")
 
     def _create_tags_section(self, bot: Bot) -> ft.Control:
         """Create tags section"""

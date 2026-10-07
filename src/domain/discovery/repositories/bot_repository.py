@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from typing import List, Optional
-from ..entities import Bot
+from ..entities import Bot, BotDetails
 
 
 class BotRepository(ABC):
@@ -16,6 +16,13 @@ class BotRepository(ABC):
     @abstractmethod
     async def find_by_id(self, bot_id: int) -> Optional[Bot]:
         """Find Bot by ID"""
+        pass
+
+    @abstractmethod
+    async def find_details(
+        self, bot_id: int, author_ids: Optional[List[str]] = None
+    ) -> BotDetails:
+        """Get the author/partner details shown on the official bot page"""
         pass
 
     @abstractmethod

@@ -1,5 +1,6 @@
 """Helpers for the data returned by the DCTW API."""
 
+import json
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -86,6 +87,47 @@ def to_bool(value) -> bool:
     if isinstance(value, str):
         return value.strip().lower() in {"1", "true", "yes", "y", "on"}
     return bool(value)
+
+
+def parse_author_ids(data: dict) -> list[str]:
+    """Return the Discord ids of a bot's authors.
+
+    The API stores them as a single id, a comma separated list or a JSON
+    array string; the website merges ``author`` with ``devs``/``co_authors``.
+    """
+    ids: list[str] = []
+
+    def add(value) -> None:
+        if value is None:
+            return
+
+        if isinstance(value, (list, tuple, set)):
+            for item in value:
+                add(item)
+            return
+
+        text = str(value).strip()
+        if not text:
+            return
+
+        if text.startswith("["):
+            try:
+                parsed = json.loads(text)
+            except ValueError:
+                parsed = None
+            if isinstance(parsed, list):
+                for item in parsed:
+                    add(item)
+                return
+
+        for part in text.split(","):
+            part = part.strip()
+            if part and part not in ids:
+                ids.append(part)
+
+    add(data.get("author"))
+    add(data.get("devs") or data.get("co_authors"))
+    return ids
 
 
 def is_listed_item(data: dict) -> bool:

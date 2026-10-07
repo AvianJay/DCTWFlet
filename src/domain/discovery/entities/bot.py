@@ -1,7 +1,7 @@
 """Bot entity"""
 
 from typing import List, Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from domain.shared import Entity
 from ..value_objects import (
     Tag,
@@ -25,6 +25,23 @@ class BotLinks:
     website: Optional[str] = None
 
 
+@dataclass(frozen=True)
+class BotAuthor:
+    """Author/developer profile shown next to the bot on the official page."""
+
+    id: str
+    name: str
+    avatar_url: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class BotDetails:
+    """Bot information that is only available on the official detail page."""
+
+    is_partnered: bool = False
+    authors: List[BotAuthor] = field(default_factory=list)
+
+
 class Bot(Entity[int]):
     """Discord Bot entity"""
 
@@ -45,6 +62,7 @@ class Bot(Entity[int]):
         timestamps: Timestamps,
         banner: Optional[BannerUrl] = None,
         pinned: bool = False,
+        author_ids: Optional[List[str]] = None,
     ):
         super().__init__(id)
         self._validate_name(name)
@@ -62,6 +80,7 @@ class Bot(Entity[int]):
         self._links = links
         self._timestamps = timestamps
         self._pinned = pinned
+        self._author_ids = list(author_ids or [])
 
     @property
     def name(self) -> str:
@@ -70,6 +89,10 @@ class Bot(Entity[int]):
     @property
     def pinned(self) -> bool:
         return self._pinned
+
+    @property
+    def author_ids(self) -> List[str]:
+        return self._author_ids.copy()
 
     @property
     def avatar(self) -> AvatarUrl:
