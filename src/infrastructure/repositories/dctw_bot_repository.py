@@ -94,10 +94,11 @@ class DctwBotRepository(BotRepository):
         if not data.get("created_at"):
             data["created_at"] = "1999-01-01T00:00:00Z"
 
-        verified = (
-            to_bool(data.get("is_official_verified"))
-            or to_bool(data.get("is_dc_verified"))
-            or to_bool(data.get("verified", False))
+        # "is_official_verified" is "1" for every listed bot (it only means the
+        # bot is published on DCTW), so the blue check must follow the Discord
+        # verification flag alone, exactly like the website does.
+        verified = to_bool(data.get("is_dc_verified")) or to_bool(
+            data.get("verified", False)
         )
 
         return Bot(

@@ -57,7 +57,6 @@ class TemplateListPage:
             options=[
                 ft.dropdown.Option("default", "預設排序"),
                 ft.dropdown.Option("mostVotes", "最多投票"),
-                ft.dropdown.Option("mostActive", "最高活躍度"),
             ],
             value="default",
             width=150,
