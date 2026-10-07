@@ -9,6 +9,7 @@ authors = [
 ]
 dependencies = [
     "flet==0.84.0",
+    "flet-webview==0.84.0",
     "requests~=2.32.5",
     "aiofiles~=25.1.0",
     "httpx~=0.28.1",
@@ -35,6 +36,7 @@ path = "src"
 [tool.uv]
 dev-dependencies = [
     "flet[all]==0.84.0",
+    "flet-webview==0.84.0",
     "requests~=2.32.5",
     "aiofiles~=25.1.0",
     "httpx~=0.28.1",
@@ -45,3 +47,4 @@ package-mode = false
 
 [tool.poetry.group.dev.dependencies]
 flet = {extras = ["all"], version = "0.84.0"}
+flet-webview = "0.84.0"

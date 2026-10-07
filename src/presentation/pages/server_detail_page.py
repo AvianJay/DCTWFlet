@@ -6,9 +6,10 @@ from typing import Optional
 from application.services import DiscoveryService
 from domain.discovery.entities import Server
 from domain.shared import EntityNotFoundException
+from infrastructure.api import DctwApiClient
 from infrastructure.di import get_container
 from infrastructure.image import ImageServer
-from presentation.components import build_avatar
+from presentation.components import VoteButton, build_avatar
 from presentation.tag_mappings import SERVER_TAGS
 from presentation.url_helper import open_url
 
@@ -25,6 +26,7 @@ class ServerDetailPage:
             DiscoveryService
         )
         self.image_server: ImageServer = self.container.resolve(ImageServer)
+        self.api_client: DctwApiClient = self.container.resolve(DctwApiClient)
         self._server: Optional[Server] = None
 
     def _get_tag_info(self, tag_name: str) -> tuple[str, str]:
@@ -247,6 +249,12 @@ class ServerDetailPage:
                         icon=ft.Icons.ADD,
                         content=ft.Text("加入伺服器"),
                         on_click=lambda e: open_url(self.page, server.links.invite.value),
+                    ),
+                    VoteButton(
+                        page=self.page,
+                        api_client=self.api_client,
+                        item_type="servers",
+                        item_id=server.id,
                     ),
                 ],
                 alignment=ft.MainAxisAlignment.CENTER,

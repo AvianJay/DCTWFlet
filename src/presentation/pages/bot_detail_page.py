@@ -7,8 +7,9 @@ from application.services import DiscoveryService
 from domain.discovery.entities import Bot, BotAuthor
 from domain.shared import EntityNotFoundException
 from infrastructure.di import get_container
+from infrastructure.api import DctwApiClient
 from infrastructure.image import ImageServer
-from presentation.components import build_avatar
+from presentation.components import VoteButton, build_avatar
 from presentation.tag_mappings import BOT_TAGS
 from presentation.url_helper import open_url
 
@@ -27,7 +28,9 @@ class BotDetailPage:
             DiscoveryService
         )
         self.image_server: ImageServer = self.container.resolve(ImageServer)
+        self.api_client: DctwApiClient = self.container.resolve(DctwApiClient)
         self._bot: Optional[Bot] = None
+        self._vote_count_text: Optional[ft.Text] = None
         self._badges_container: Optional[ft.Container] = None
         self._author_container: Optional[ft.Container] = None
 
@@ -463,18 +466,27 @@ class BotDetailPage:
     def _create_statistics_section(self, bot: Bot) -> ft.Control:
         """Create statistics section"""
 
+        self._vote_count_text = ft.Text(
+            str(bot.statistics.votes),
+            size=20,
+            weight=ft.FontWeight.BOLD,
+        )
+
         return ft.Container(
             content=ft.Row(
                 [
                     ft.Column(
                         [
                             ft.Icon(ft.Icons.STAR, size=32),
-                            ft.Text(
-                                str(bot.statistics.votes),
-                                size=20,
-                                weight=ft.FontWeight.BOLD,
-                            ),
+                            self._vote_count_text,
                             ft.Text("投票數", size=14, color=ft.Colors.GREY),
+                            VoteButton(
+                                page=self.page,
+                                api_client=self.api_client,
+                                item_type="bots",
+                                item_id=bot.id,
+                                on_success=self._increment_vote_count,
+                            ),
                         ],
                         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
@@ -496,6 +508,22 @@ class BotDetailPage:
             ),
             padding=ft.padding.all(20),
         )
+
+    def _increment_vote_count(self) -> None:
+        """Increase the displayed vote count after a successful vote."""
+        if self._vote_count_text is None:
+            return
+
+        try:
+            current = int(str(self._vote_count_text.value))
+        except (TypeError, ValueError):
+            return
+
+        self._vote_count_text.value = str(current + 1)
+        try:
+            self.page.update()
+        except Exception:
+            logger.debug("Page closed before the vote count could be refreshed")
 
     def _show_error(self, message: str):
         """Show error message"""

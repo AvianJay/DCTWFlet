@@ -12,7 +12,7 @@ from infrastructure.api import DctwApiClient
 from infrastructure.di import get_container
 
 from application.services import DiscoveryService
-from presentation.components import ApiKeyDialog, Toast
+from presentation.components import ApiKeyDialog, DiscordLoginDialog, Toast
 
 
 class SettingsPage:
@@ -98,14 +98,25 @@ class SettingsPage:
                             ft.Text("API設置", size=18, weight=ft.FontWeight.BOLD),
                             ft.Divider(),
                             self.api_key_status,
-                            ft.FilledButton(
-                                "從剪貼簿貼上 API Key",
-                                icon=ft.Icons.CONTENT_PASTE,
-                                on_click=lambda _: self._open_api_key_dialog(),
+                            ft.Row(
+                                [
+                                    ft.FilledButton(
+                                        "使用 Discord 登入",
+                                        icon=ft.Icons.LOGIN,
+                                        on_click=lambda _: self._open_login_dialog(),
+                                    ),
+                                    ft.OutlinedButton(
+                                        "從剪貼簿貼上 API Key",
+                                        icon=ft.Icons.CONTENT_PASTE,
+                                        on_click=lambda _: self._open_api_key_dialog(),
+                                    ),
+                                ],
+                                spacing=10,
+                                wrap=True,
                             ),
                             ft.Text(
-                                "請先在 DCTW 官網登入並於後台點擊「複製 API KEY」，"
-                                "回到本應用程式再點擊上方按鈕貼上。",
+                                "點擊「使用 Discord 登入」在應用程式內完成登入，"
+                                "API Key 會自動填入；也可以到 DCTW 後台複製 API KEY 後貼上。",
                                 size=12,
                                 color=ft.Colors.GREY,
                             ),
@@ -218,17 +229,28 @@ class SettingsPage:
     def _update_api_key_status(self, api_key) -> None:
         """Update the API key status label"""
         if api_key and api_key.is_set:
-            self.api_key_status.value = f"已設定 API Key：{api_key}"
+            self.api_key_status.value = f"已使用 Discord 登入並設定 API Key：{api_key}"
             self.api_key_status.color = ft.Colors.GREEN
         else:
             self.api_key_status.value = (
-                "尚未設定 API Key，請先從 DCTW 後台複製 API KEY 後貼上。"
+                "尚未設定 API Key，請點擊下方「使用 Discord 登入」自動填入。"
             )
             self.api_key_status.color = ft.Colors.ORANGE
 
     def _open_api_key_dialog(self):
         """Open the dialog that fills in the API key from the clipboard"""
         dialog = ApiKeyDialog(
+            page=self.page,
+            preference_service=self.pref_service,
+            discovery_service=self.discovery_service,
+            api_client=self.api_client,
+            on_saved=self._on_api_key_saved,
+        )
+        dialog.show()
+
+    def _open_login_dialog(self):
+        """Open the in-app Discord login that fills in the API key"""
+        dialog = DiscordLoginDialog(
             page=self.page,
             preference_service=self.pref_service,
             discovery_service=self.discovery_service,

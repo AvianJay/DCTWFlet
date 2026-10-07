@@ -5,7 +5,9 @@ from typing import Optional
 from application.services import DiscoveryService
 from domain.discovery.entities import Template
 from domain.shared import EntityNotFoundException
+from infrastructure.api import DctwApiClient
 from infrastructure.di import get_container
+from presentation.components import VoteButton
 from presentation.tag_mappings import TEMPLATE_TAGS
 from presentation.url_helper import open_url
 
@@ -21,6 +23,7 @@ class TemplateDetailPage:
         self.discovery_service: DiscoveryService = self.container.resolve(
             DiscoveryService
         )
+        self.api_client: DctwApiClient = self.container.resolve(DctwApiClient)
         self._template: Optional[Template] = None
 
     def _get_tag_info(self, tag_name: str) -> tuple[str, str]:
@@ -107,6 +110,12 @@ class TemplateDetailPage:
                                 on_click=lambda e: open_url(
                                     self.page, template.links.share_url
                                 ),
+                            ),
+                            VoteButton(
+                                page=self.page,
+                                api_client=self.api_client,
+                                item_type="templates",
+                                item_id=template.id,
                             ),
                         ],
                         alignment=ft.MainAxisAlignment.CENTER,

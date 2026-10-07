@@ -1,6 +1,6 @@
 """DCTW API client (API v2)"""
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 import json
 import logging
 import re
@@ -8,7 +8,11 @@ import httpx
 
 from domain.preferences.value_objects import ApiKey
 from infrastructure.filesystem import ConfigStorage
-from ..config.constants import DCTW_API_BASE_URL, DCTW_API_VERSION_PREFIX
+from ..config.constants import (
+    DCTW_API_BASE_URL,
+    DCTW_API_V2_VERSION_PREFIX,
+    DCTW_API_VERSION_PREFIX,
+)
 from .http_client import AsyncHttpClient
 
 logger = logging.getLogger(__name__)
@@ -36,6 +40,7 @@ class DctwApiClient:
 
     DEFAULT_BASE_URL = DCTW_API_BASE_URL
     DEFAULT_API_PREFIX = DCTW_API_VERSION_PREFIX
+    DEFAULT_API_V2_PREFIX = DCTW_API_V2_VERSION_PREFIX
     MAX_PAGES = 50
 
     # Server action used by the official website to resolve Discord user ids
@@ -52,6 +57,7 @@ class DctwApiClient:
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
         api_prefix: Optional[str] = None,
+        api_v2_prefix: Optional[str] = None,
         user_agent: str = "DCTWFlet/0.1.0",
         config_storage: Optional[ConfigStorage] = None,
     ):
@@ -59,6 +65,9 @@ class DctwApiClient:
         self._base_url = (base_url or self.DEFAULT_BASE_URL).rstrip("/")
         self._api_prefix = self._normalize_path_prefix(
             api_prefix or self.DEFAULT_API_PREFIX
+        )
+        self._api_v2_prefix = self._normalize_path_prefix(
+            api_v2_prefix or self.DEFAULT_API_V2_PREFIX
         )
         self._user_agent = user_agent
         self._config_storage = config_storage
@@ -70,6 +79,10 @@ class DctwApiClient:
     @property
     def api_prefix(self) -> str:
         return self._api_prefix
+
+    @property
+    def api_v2_prefix(self) -> str:
+        return self._api_v2_prefix
 
     async def get_bots(self) -> List[Dict[str, Any]]:
         """Get all bots."""
@@ -180,7 +193,11 @@ class DctwApiClient:
         return await self._get_item(f"/templates/{template_id}/")
 
     async def validate_api_key(self, api_key: Optional[str]) -> bool:
-        """Check whether the DCTW API accepts the given API key."""
+        """Check whether the DCTW API accepts the given API key.
+
+        API v2 answers 401/403 for invalid keys (API v1 returns data even
+        without a valid key), so the key is verified against /api/v2/bots/.
+        """
         key = ApiKey.normalize(api_key)
         if not key:
             return False
@@ -189,13 +206,19 @@ class DctwApiClient:
             async with AsyncHttpClient(
                 self._base_url, headers=self._build_headers(key)
             ) as client:
-                await client.get(self._resolve_endpoint("/bots/"))
-            return True
+                response = await client.get(f"{self._api_v2_prefix}/bots/")
         except httpx.HTTPStatusError as e:
             if e.response.status_code in (401, 403):
-                logger.info("API key validation rejected with %s", e.response.status_code)
+                logger.info(
+                    "API key validation rejected with %s", e.response.status_code
+                )
                 return False
             raise
+
+        if isinstance(response, dict) and response.get("ok") is False:
+            return False
+
+        return True
 
     async def post(
         self,
@@ -213,6 +236,50 @@ class DctwApiClient:
             return await self._request(
                 client, "POST", resolved_endpoint, json=json, data=data
             )
+
+    VOTE_ENDPOINT_TYPES = {
+        "bot": "bots",
+        "bots": "bots",
+        "server": "servers",
+        "servers": "servers",
+        "template": "templates",
+        "templates": "templates",
+    }
+
+    async def vote(self, item_type: str, item_id: Union[int, str]) -> Dict[str, Any]:
+        """Vote for a bot, server or template.
+
+        The API answers HTTP 200 even for business failures (for example
+        while the vote cooldown is still active), so callers must check the
+        ok flag of the returned body instead of the status code.
+
+        Returns:
+            The response body, e.g. {"ok": True, "message": "已成功投票！"}.
+        """
+        collection = self.VOTE_ENDPOINT_TYPES.get((item_type or "").strip().lower())
+        if collection is None:
+            raise ValueError(f"Unsupported item type: {item_type}")
+
+        api_key = await self._require_api_key()
+        endpoint = f"{self._api_v2_prefix}/{collection}/{item_id}/vote"
+
+        try:
+            async with AsyncHttpClient(
+                self._base_url, headers=self._build_headers(api_key)
+            ) as client:
+                response = await self._request(client, "POST", endpoint)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                return {
+                    "ok": False,
+                    "message": "找不到該資源，請確認 ID 是否正確無誤。",
+                }
+            raise
+
+        if isinstance(response, dict):
+            return response
+
+        return {"ok": False, "message": "投票失敗：API 回應格式不正確。"}
 
     async def _get_collection(self, endpoint: str) -> List[Dict[str, Any]]:
         api_key = await self._require_api_key()
