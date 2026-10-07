@@ -38,16 +38,30 @@ class DctwTemplateRepository(TemplateRepository):
         templates = [self._map_to_domain(item) for item in data]
 
         await self._cache.set(
-            self.CACHE_KEY, [self._serialize_template(t) for t in templates], ttl=60
+            self.CACHE_KEY, [self._serialize_template(t) for t in templates], ttl=300
         )
 
         logger.info(f"Loaded {len(templates)} templates from API")
         return templates
 
     async def find_by_id(self, template_id: int) -> Optional[Template]:
-        """Find Template by ID"""
-        templates = await self.find_all()
-        return next((t for t in templates if t.id == template_id), None)
+        """Find Template by ID.
+
+        Uses the cached list when possible and falls back to the single
+        template endpoint instead of refetching every template.
+        """
+        cached = await self._cache.get(self.CACHE_KEY)
+        if cached:
+            for item in cached:
+                template = self._deserialize_template(item)
+                if template.id == template_id:
+                    return template
+
+        data = await self._api_client.get_template(template_id)
+        if data is not None:
+            return self._map_to_domain(data)
+
+        return None
 
     async def clear_cache(self) -> None:
         """Clear cache"""

@@ -70,6 +70,10 @@ class DctwApiClient:
         logger.info(f"Fetching comments for bot {bot_id}")
         return await self._get_collection(f"/bots/{bot_id}/comments/")
 
+    async def get_bot(self, bot_id: int) -> Optional[Dict[str, Any]]:
+        """Get a single bot by ID. Returns None when the API answers 404."""
+        return await self._get_item(f"/bots/{bot_id}/")
+
     async def get_servers(self) -> List[Dict[str, Any]]:
         """Get all servers."""
         logger.info("Fetching servers from DCTW API")
@@ -80,6 +84,10 @@ class DctwApiClient:
         logger.info(f"Fetching comments for server {server_id}")
         return await self._get_collection(f"/servers/{server_id}/comments/")
 
+    async def get_server(self, server_id: int) -> Optional[Dict[str, Any]]:
+        """Get a single server by ID. Returns None when the API answers 404."""
+        return await self._get_item(f"/servers/{server_id}/")
+
     async def get_templates(self) -> List[Dict[str, Any]]:
         """Get all templates."""
         logger.info("Fetching templates from DCTW API")
@@ -89,6 +97,10 @@ class DctwApiClient:
         """Get template comments."""
         logger.info(f"Fetching comments for template {template_id}")
         return await self._get_collection(f"/templates/{template_id}/comments/")
+
+    async def get_template(self, template_id: int) -> Optional[Dict[str, Any]]:
+        """Get a single template by ID. Returns None when the API answers 404."""
+        return await self._get_item(f"/templates/{template_id}/")
 
     async def validate_api_key(self, api_key: Optional[str]) -> bool:
         """Check whether the DCTW API accepts the given API key."""
@@ -145,6 +157,31 @@ class DctwApiClient:
                     break
 
         return items
+
+    async def _get_item(self, endpoint: str) -> Optional[Dict[str, Any]]:
+        """Fetch a single resource. Returns None when the API answers 404."""
+        api_key = await self._require_api_key()
+
+        async with AsyncHttpClient(
+            self._base_url, headers=self._build_headers(api_key)
+        ) as client:
+            try:
+                response = await self._request(
+                    client, "GET", self._resolve_endpoint(endpoint)
+                )
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 404:
+                    logger.info(f"Resource not found: {endpoint}")
+                    return None
+                raise
+
+        if isinstance(response, dict):
+            data = response.get("data")
+            if isinstance(data, dict):
+                return data
+            return response
+
+        return None
 
     async def _request(self, client: AsyncHttpClient, method: str, endpoint: str, **kwargs):
         """Send a request and translate auth failures into domain errors."""

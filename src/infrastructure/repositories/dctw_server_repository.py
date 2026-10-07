@@ -48,16 +48,30 @@ class DctwServerRepository(ServerRepository):
         servers = [self._map_to_domain(item) for item in data]
 
         await self._cache.set(
-            self.CACHE_KEY, [self._serialize_server(s) for s in servers], ttl=60
+            self.CACHE_KEY, [self._serialize_server(s) for s in servers], ttl=300
         )
 
         logger.info(f"Loaded {len(servers)} servers from API")
         return servers
 
     async def find_by_id(self, server_id: int) -> Optional[Server]:
-        """Find Server by ID"""
-        servers = await self.find_all()
-        return next((s for s in servers if s.id == server_id), None)
+        """Find Server by ID.
+
+        Uses the cached list when possible and falls back to the single
+        server endpoint, avoiding multi-megabyte list downloads.
+        """
+        cached = await self._cache.get(self.CACHE_KEY)
+        if cached:
+            for item in cached:
+                server = self._deserialize_server(item)
+                if server.id == server_id:
+                    return server
+
+        data = await self._api_client.get_server(server_id)
+        if data is not None:
+            return self._map_to_domain(data)
+
+        return None
 
     async def clear_cache(self) -> None:
         """Clear cache"""

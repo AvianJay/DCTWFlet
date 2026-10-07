@@ -30,6 +30,7 @@ class ImageServer:
         self._port: Optional[int] = None
         self._server: Optional[asyncio.Server] = None
         self._url_mapping: Dict[str, str] = {}
+        self._url_to_id: Dict[str, str] = {}
         self._download_locks: Dict[str, asyncio.Lock] = {}
 
     async def _send_response(
@@ -44,6 +45,7 @@ class ImageServer:
             f"HTTP/1.1 {status} {reason}",
             f"Content-Length: {len(body)}",
             f"Content-Type: {content_type}",
+            "Access-Control-Allow-Origin: *",
             "Connection: close",
             "",
             "",
@@ -162,11 +164,16 @@ class ImageServer:
                 await writer.wait_closed()
 
     def register_image(self, url: str) -> str:
+        existing_id = self._url_to_id.get(url)
+        if existing_id is not None:
+            return existing_id
+
         image_id = str(random.randint(100000, 999999))
         while image_id in self._url_mapping:
             image_id = str(random.randint(100000, 999999))
 
         self._url_mapping[image_id] = url
+        self._url_to_id[url] = image_id
         return image_id
 
     def get_image_url(self, image_id: str) -> str:

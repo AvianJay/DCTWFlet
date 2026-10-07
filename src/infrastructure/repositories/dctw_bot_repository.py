@@ -49,16 +49,31 @@ class DctwBotRepository(BotRepository):
         bots = [self._map_to_domain(item) for item in data]
 
         await self._cache.set(
-            self.CACHE_KEY, [self._serialize_bot(bot) for bot in bots], ttl=60
+            self.CACHE_KEY, [self._serialize_bot(bot) for bot in bots], ttl=300
         )
 
         logger.info(f"Loaded {len(bots)} bots from API")
         return bots
 
     async def find_by_id(self, bot_id: int) -> Optional[Bot]:
-        """Find Bot by ID"""
-        bots = await self.find_all()
-        return next((bot for bot in bots if bot.id == bot_id), None)
+        """Find Bot by ID.
+
+        The cached list is checked first so opening a detail page from a
+        freshly loaded list is instant; otherwise only the single bot is
+        fetched instead of the whole collection.
+        """
+        cached = await self._cache.get(self.CACHE_KEY)
+        if cached:
+            for item in cached:
+                bot = self._deserialize_bot(item)
+                if bot.id == bot_id:
+                    return bot
+
+        data = await self._api_client.get_bot(bot_id)
+        if data is not None:
+            return self._map_to_domain(data)
+
+        return None
 
     async def clear_cache(self) -> None:
         """Clear cache"""

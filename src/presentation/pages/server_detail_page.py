@@ -172,7 +172,7 @@ class ServerDetailPage:
         if banner_url:
             banner_content = ft.Image(
                 src=banner_url,
-                fit=ft.ImageFit.COVER,
+                fit=ft.BoxFit.COVER,
                 width=float("inf"),
                 error_content=ft.Container(bgcolor=ft.Colors.SURFACE),
             )

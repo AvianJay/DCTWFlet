@@ -74,14 +74,11 @@ class SettingsPage:
 
         return ft.Column(
             [
-                # Title bar
-                ft.Container(
-                    content=ft.Text("應用程式設定", size=20, weight=ft.FontWeight.BOLD),
+                # Title bar (same style as the bot/server/template list headers)
+                ft.AppBar(
+                    title=ft.Text("應用程式設定"),
+                    center_title=False,
                     bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST,
-                    height=56,
-                    alignment=ft.Alignment(-1, 0),
-                    padding=ft.padding.only(left=16, right=16),
-                    margin=ft.margin.only(top=32),
                 ),
                 # Settings items
                 ft.Container(
