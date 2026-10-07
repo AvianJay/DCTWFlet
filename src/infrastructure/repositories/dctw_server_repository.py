@@ -20,6 +20,8 @@ from .api_helpers import (
     normalize_optional_url,
     normalize_url,
     parse_datetime,
+    parse_tag_list,
+    to_bool,
 )
 
 logger = logging.getLogger(__name__)
@@ -85,10 +87,10 @@ class DctwServerRepository(ServerRepository):
             data.get("banner") or data.get("banner_url")
         )
         badge = data.get("badge") if isinstance(data.get("badge"), dict) else {}
-        is_partnered = bool(
-            badge.get("partner")
-            or data.get("partnered")
-            or data.get("is_partnered", False)
+        is_partnered = (
+            to_bool(badge.get("partner"))
+            or to_bool(data.get("partnered"))
+            or to_bool(data.get("is_partnered", False))
         )
 
         if not data.get("bumped_at"):
@@ -104,16 +106,12 @@ class DctwServerRepository(ServerRepository):
             description=data.get("description") or "",
             introduce=data.get("introduce") or "",
             is_partnered=is_partnered,
-            nsfw=bool(data.get("nsfw", False)),
+            nsfw=to_bool(data.get("nsfw", False)),
             statistics=Statistics(
                 votes=int(data.get("vote_count", data.get("votes", 0)) or 0),
                 count=int(data.get("members", data.get("member_count", 0)) or 0),
             ),
-            tags=[
-                ServerTag(tag)
-                for tag in (data.get("tags") or [])
-                if tag in ServerTag.VALID_TAGS
-            ],
+            tags=self._map_tags(data.get("tags")),
             links=ServerLinks(invite=InviteUrl(invite_url)),
             timestamps=Timestamps(
                 created_at=parse_datetime(
@@ -124,8 +122,18 @@ class DctwServerRepository(ServerRepository):
                 ),
             ),
             banner=BannerUrl(banner_url) if banner_url else None,
-            pinned=data.get("pinned", False),
+            pinned=to_bool(data.get("pinned", False)),
         )
+
+    @staticmethod
+    def _map_tags(value) -> list[ServerTag]:
+        """Map raw tags, merging the two spellings of "programing"."""
+        tags: list[ServerTag] = []
+        for tag in parse_tag_list(value):
+            normalized = "programing" if tag == "programming" else tag
+            if normalized in ServerTag.VALID_TAGS:
+                tags.append(ServerTag(normalized))
+        return tags
 
     def _serialize_server(self, server: Server) -> dict:
         """Serialize for cache"""

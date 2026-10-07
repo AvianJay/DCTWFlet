@@ -3,11 +3,14 @@
 Display list with filtering and sorting support
 """
 
-import flet as ft
+import logging
 from typing import Optional
+
+import flet as ft
 
 from application.services import DiscoveryService, PreferenceService
 from domain.discovery.value_objects import (
+    BotTag,
     FilterCriteria,
     SortOption,
 )
@@ -15,8 +18,12 @@ from domain.discovery.entities import Bot
 from infrastructure.api import ApiKeyMissingError, InvalidApiKeyError
 from infrastructure.config.constants import DEFAULT_AVATAR_URL
 from infrastructure.di import get_container
-from presentation.tag_mappings import BOT_TAGS
+from presentation.components import Toast
+from presentation.tag_mappings import BOT_TAGS, BOT_TAG_FILTERS
 from presentation.url_helper import open_url
+
+
+logger = logging.getLogger(__name__)
 
 
 class BotListPage:
@@ -31,6 +38,7 @@ class BotListPage:
         self.preference_service: PreferenceService = self.container.resolve(
             PreferenceService
         )
+        self.toast = Toast(self.page)
 
         # UI組件
         self.bot_list = ft.ListView(
@@ -73,21 +81,35 @@ class BotListPage:
             padding=ft.padding.only(bottom=10),
         )
 
+        # Tag filter state
+        self._selected_tags: set[str] = set()
+        self.tag_chips: dict[str, ft.Chip] = {}
+        self.tag_chips_row: Optional[ft.Row] = None
+        self.clear_tags_button = ft.TextButton(
+            "清除",
+            icon=ft.Icons.CLOSE,
+            tooltip="清除標籤篩選",
+            visible=False,
+            on_click=self._clear_tags,
+        )
+
     def build(self) -> ft.Control:
         """Build page UI"""
         self.page.run_task(self._load_bots)
 
         return ft.Column(
             [
-                # Title bar
-                # ft.Container(
-                #     content=ft.Text("Discord 機器人清單", size=24, weight=ft.FontWeight.BOLD),
-                #     bgcolor=ft.Colors.SURFACE,
-                #     padding=15,
-                # ),
                 ft.AppBar(
                     title=ft.Text("DCTW 機器人清單"),
+                    center_title=False,
                     bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST,
+                    actions=[
+                        ft.IconButton(
+                            icon=ft.Icons.REFRESH,
+                            tooltip="重新整理",
+                            on_click=lambda _: self.page.run_task(self._refresh),
+                        )
+                    ],
                 ),
                 ft.Container(
                     content=ft.Row(
@@ -101,11 +123,83 @@ class BotListPage:
                     ),
                     padding=10,
                 ),
+                self._build_tag_filter(),
                 self.progress,
                 ft.Container(self.bot_list, expand=True),
             ],
             expand=True,
         )
+
+    def _build_tag_filter(self) -> ft.Control:
+        """Create the tag filter chips (same tags as the official website)."""
+        self.tag_chips_row = ft.Row(
+            [
+                self._create_tag_chip(name, *BOT_TAGS[name])
+                for name in BOT_TAG_FILTERS
+                if name in BOT_TAGS
+            ],
+            spacing=6,
+            scroll=ft.ScrollMode.AUTO,
+            expand=True,
+        )
+
+        return ft.Container(
+            content=ft.Row(
+                [self.tag_chips_row, self.clear_tags_button],
+                spacing=4,
+            ),
+            padding=ft.padding.only(left=10, right=10, bottom=6),
+        )
+
+    def _create_tag_chip(self, name: str, label: str, icon) -> ft.Chip:
+        chip = ft.Chip(
+            label=ft.Text(label, size=12),
+            leading=ft.Icon(icon, size=16),
+            selected=False,
+            show_checkmark=True,
+            on_select=lambda e, tag_name=name: self._on_tag_select(tag_name, e),
+        )
+        self.tag_chips[name] = chip
+        return chip
+
+    def _on_tag_select(self, name: str, e) -> None:
+        chip = self.tag_chips.get(name)
+        if chip is None:
+            return
+
+        chip.selected = not bool(chip.selected)
+        if chip.selected:
+            self._selected_tags.add(name)
+        else:
+            self._selected_tags.discard(name)
+
+        self.clear_tags_button.visible = bool(self._selected_tags)
+        self.tag_chips_row.update()
+        self.clear_tags_button.update()
+        self.page.run_task(self._load_bots)
+
+    def _clear_tags(self, e) -> None:
+        if not self._selected_tags:
+            return
+
+        self._selected_tags.clear()
+        for chip in self.tag_chips.values():
+            chip.selected = False
+
+        self.clear_tags_button.visible = False
+        self.tag_chips_row.update()
+        self.clear_tags_button.update()
+        self.page.run_task(self._load_bots)
+
+    async def _refresh(self) -> None:
+        """Clear the cached data and reload the list."""
+        try:
+            await self.discovery_service.clear_all_caches()
+        except Exception:
+            logger.exception("Failed to clear caches before refresh")
+
+        await self._load_bots()
+        self.toast.show("已重新整理")
 
     async def _load_bots(self):
         """Load list"""
@@ -118,6 +212,11 @@ class BotListPage:
             nsfw_enabled = bool(preferences.nsfw_filter)
 
             self._current_filter = FilterCriteria(
+                tags=[
+                    BotTag(name)
+                    for name in BOT_TAG_FILTERS
+                    if name in self._selected_tags
+                ],
                 search_text=search_text,
                 nsfw_enabled=nsfw_enabled,
             )

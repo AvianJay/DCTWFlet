@@ -46,6 +46,40 @@ def normalize_optional_url(value: Optional[str]) -> Optional[str]:
     return normalize_url(value) or None
 
 
+def parse_tag_list(value) -> list[str]:
+    """Return the tags of an API item as a list of clean lowercase names.
+
+    The DCTW API returns tags as a comma separated string, while the cached
+    payloads store them as a list. Both shapes are accepted so cached data
+    keeps working after the API format changes.
+    """
+    if not value:
+        return []
+
+    if isinstance(value, str):
+        raw_tags = value.split(",")
+    elif isinstance(value, (list, tuple, set)):
+        raw_tags = []
+        for item in value:
+            raw_tags.extend(str(item).split(","))
+    else:
+        return []
+
+    tags: list[str] = []
+    for raw_tag in raw_tags:
+        tag = raw_tag.strip().lower()
+        if tag and tag not in tags:
+            tags.append(tag)
+    return tags
+
+
+def to_bool(value) -> bool:
+    """Convert the API's mixed booleans ("0"/"1"/true/false) to a real bool."""
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+    return bool(value)
+
+
 def parse_datetime(value) -> datetime:
     """Parse an API timestamp, assuming UTC+8 for values without a timezone."""
     if isinstance(value, datetime):

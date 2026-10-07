@@ -12,7 +12,7 @@ from domain.discovery.value_objects import (
 )
 from ..api import DctwApiClient
 from ..cache import CacheManager
-from .api_helpers import normalize_url, parse_datetime
+from .api_helpers import normalize_url, parse_datetime, parse_tag_list, to_bool
 
 logger = logging.getLogger(__name__)
 
@@ -72,13 +72,13 @@ class DctwTemplateRepository(TemplateRepository):
             name=data.get("name") or f"Template {data['id']}",
             description=data.get("description") or "",
             introduce=data.get("introduce") or "",
-            nsfw=bool(data.get("nsfw", False)),
+            nsfw=to_bool(data.get("nsfw", False)),
             statistics=Statistics(
                 votes=int(data.get("vote_count", data.get("votes", 0)) or 0), count=0
             ),
             tags=[
                 TemplateTag(tag)
-                for tag in (data.get("tags") or [])
+                for tag in parse_tag_list(data.get("tags"))
                 if tag in TemplateTag.VALID_TAGS
             ],
             links=TemplateLinks(share_url=share_url),
@@ -90,7 +90,7 @@ class DctwTemplateRepository(TemplateRepository):
                     data.get("bumped_at", "1999-01-01T00:00:00Z")
                 ),
             ),
-            pinned=data.get("pinned", False),
+            pinned=to_bool(data.get("pinned", False)),
         )
 
     def _serialize_template(self, template: Template) -> dict:

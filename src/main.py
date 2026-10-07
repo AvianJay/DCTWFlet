@@ -240,8 +240,8 @@ async def main(page: ft.Page):
 
     def create_tab_button(index: int) -> ft.Control:
         icon_off, icon_on, text = tab_icons[index]
-        icon = ft.Icon(icon_off, size=21, color=ft.Colors.ON_SURFACE_VARIANT)
-        label = ft.Text(text, size=11, color=ft.Colors.ON_SURFACE_VARIANT)
+        icon = ft.Icon(icon_off, size=22, color=ft.Colors.ON_SURFACE_VARIANT)
+        label = ft.Text(text, size=12, color=ft.Colors.ON_SURFACE_VARIANT)
 
         def on_click(e, tab_index=index):
             select_tab(tab_index)
@@ -255,8 +255,8 @@ async def main(page: ft.Page):
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
             ),
             expand=True,
-            height=38,
-            border_radius=10,
+            height=44,
+            border_radius=12,
             alignment=ft.Alignment(0, 0),
             ink=True,
             on_click=on_click,
@@ -269,7 +269,7 @@ async def main(page: ft.Page):
             [create_tab_button(index) for index in range(len(tab_icons))],
             spacing=4,
         ),
-        height=50,
+        height=56,
         padding=ft.padding.symmetric(horizontal=6, vertical=6),
         bgcolor=ft.Colors.SURFACE_CONTAINER,
         alignment=ft.Alignment(0, 0),

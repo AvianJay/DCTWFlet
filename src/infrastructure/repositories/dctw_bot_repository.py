@@ -21,6 +21,8 @@ from .api_helpers import (
     normalize_optional_url,
     normalize_url,
     parse_datetime,
+    parse_tag_list,
+    to_bool,
 )
 
 logger = logging.getLogger(__name__)
@@ -92,10 +94,10 @@ class DctwBotRepository(BotRepository):
         if not data.get("created_at"):
             data["created_at"] = "1999-01-01T00:00:00Z"
 
-        verified = bool(
-            data.get("is_official_verified")
-            or data.get("is_dc_verified")
-            or data.get("verified", False)
+        verified = (
+            to_bool(data.get("is_official_verified"))
+            or to_bool(data.get("is_dc_verified"))
+            or to_bool(data.get("verified", False))
         )
 
         return Bot(
@@ -106,17 +108,18 @@ class DctwBotRepository(BotRepository):
             introduce=data.get("introduce") or "",
             status=ContentStatus.from_string(data.get("status", "unknown")),
             verified=verified,
-            is_partnered=bool(
-                data.get("partnered") or data.get("is_partnered", False)
+            is_partnered=(
+                to_bool(data.get("partnered"))
+                or to_bool(data.get("is_partnered", False))
             ),
-            nsfw=bool(data.get("nsfw", False)),
+            nsfw=to_bool(data.get("nsfw", False)),
             statistics=Statistics(
                 votes=int(data.get("vote_count", data.get("votes", 0)) or 0),
                 count=int(data.get("servers", data.get("server_count", 0)) or 0),
             ),
             tags=[
                 BotTag(tag)
-                for tag in (data.get("tags") or [])
+                for tag in parse_tag_list(data.get("tags"))
                 if tag in BotTag.VALID_TAGS
             ],
             links=BotLinks(
@@ -141,7 +144,7 @@ class DctwBotRepository(BotRepository):
                 ),
             ),
             banner=BannerUrl(banner_url) if banner_url else None,
-            pinned=data.get("pinned", False),
+            pinned=to_bool(data.get("pinned", False)),
         )
 
     def _serialize_bot(self, bot: Bot) -> dict:
