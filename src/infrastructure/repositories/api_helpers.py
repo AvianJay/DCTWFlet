@@ -88,6 +88,31 @@ def to_bool(value) -> bool:
     return bool(value)
 
 
+def is_listed_item(data: dict) -> bool:
+    """Return whether the website shows the item in its lists.
+
+    The API also returns unpublished and prohibited (banned) records, which
+    the official website filters out. Items without those flags are kept so
+    cached payloads and other API versions keep working.
+    """
+    if not to_bool(data.get("published", True)):
+        return False
+    return not to_bool(data.get("prohibited", False))
+
+
+def is_listed_bot(data: dict) -> bool:
+    """Return whether the website shows the bot in its bot list.
+
+    On top of the shared rules the website only lists bots that passed the
+    official DCTW review (``is_official_verified``).
+    """
+    if not to_bool(
+        data.get("is_official_verified", data.get("officialVerified", True))
+    ):
+        return False
+    return is_listed_item(data)
+
+
 def parse_datetime(value) -> datetime:
     """Parse an API timestamp, assuming UTC+8 for values without a timezone."""
     if isinstance(value, datetime):

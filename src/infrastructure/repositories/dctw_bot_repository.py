@@ -18,6 +18,7 @@ from ..api import DctwApiClient
 from ..cache import CacheManager
 from .api_helpers import (
     FALLBACK_AVATAR_URL,
+    is_listed_bot,
     normalize_optional_url,
     normalize_url,
     parse_datetime,
@@ -46,7 +47,9 @@ class DctwBotRepository(BotRepository):
 
         logger.info("Fetching bots from API")
         data = await self._api_client.get_bots()
-        bots = [self._map_to_domain(item) for item in data]
+        bots = [
+            self._map_to_domain(item) for item in data if is_listed_bot(item)
+        ]
 
         await self._cache.set(
             self.CACHE_KEY, [self._serialize_bot(bot) for bot in bots], ttl=300
@@ -122,10 +125,12 @@ class DctwBotRepository(BotRepository):
             avatar=AvatarUrl(avatar_url),
             description=data.get("description") or "",
             introduce=data.get("introduce") or "",
-            status=ContentStatus.from_string(data.get("status", "unknown")),
+            # The website shows bots without a presence sample as online.
+            status=ContentStatus.from_string(data.get("status") or "online"),
             verified=verified,
             is_partnered=(
                 to_bool(data.get("partnered"))
+                or to_bool(data.get("partner"))
                 or to_bool(data.get("is_partnered", False))
             ),
             nsfw=to_bool(data.get("nsfw", False)),

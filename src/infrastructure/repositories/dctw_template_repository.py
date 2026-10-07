@@ -12,7 +12,13 @@ from domain.discovery.value_objects import (
 )
 from ..api import DctwApiClient
 from ..cache import CacheManager
-from .api_helpers import normalize_url, parse_datetime, parse_tag_list, to_bool
+from .api_helpers import (
+    is_listed_item,
+    normalize_url,
+    parse_datetime,
+    parse_tag_list,
+    to_bool,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +41,9 @@ class DctwTemplateRepository(TemplateRepository):
 
         logger.info("Fetching templates from API")
         data = await self._api_client.get_templates()
-        templates = [self._map_to_domain(item) for item in data]
+        templates = [
+            self._map_to_domain(item) for item in data if is_listed_item(item)
+        ]
 
         await self._cache.set(
             self.CACHE_KEY, [self._serialize_template(t) for t in templates], ttl=300

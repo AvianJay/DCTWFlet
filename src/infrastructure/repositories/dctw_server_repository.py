@@ -17,6 +17,7 @@ from ..api import DctwApiClient
 from ..cache import CacheManager
 from .api_helpers import (
     FALLBACK_AVATAR_URL,
+    is_listed_item,
     normalize_optional_url,
     normalize_url,
     parse_datetime,
@@ -45,7 +46,9 @@ class DctwServerRepository(ServerRepository):
 
         logger.info("Fetching servers from API")
         data = await self._api_client.get_servers()
-        servers = [self._map_to_domain(item) for item in data]
+        servers = [
+            self._map_to_domain(item) for item in data if is_listed_item(item)
+        ]
 
         await self._cache.set(
             self.CACHE_KEY, [self._serialize_server(s) for s in servers], ttl=300
