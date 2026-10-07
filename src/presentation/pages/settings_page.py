@@ -81,6 +81,7 @@ class SettingsPage:
                     height=56,
                     alignment=ft.Alignment(-1, 0),
                     padding=ft.padding.only(left=16, right=16),
+                    margin=ft.margin.only(top=32),
                 ),
                 # Settings items
                 ft.Container(
