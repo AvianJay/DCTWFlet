@@ -5,9 +5,9 @@ from typing import Optional
 from application.services import DiscoveryService
 from domain.discovery.entities import Bot
 from domain.shared import EntityNotFoundException
-from infrastructure.config.constants import DEFAULT_AVATAR_URL
 from infrastructure.di import get_container
 from infrastructure.image import ImageServer
+from presentation.components import build_avatar
 from presentation.tag_mappings import BOT_TAGS
 from presentation.url_helper import open_url
 
@@ -236,12 +236,7 @@ class BotDetailPage:
                 ft.Container(
                     content=ft.Stack(
                         [
-                            ft.CircleAvatar(
-                                foreground_image_src=avatar_url,
-                                background_image_src=DEFAULT_AVATAR_URL,
-                                bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST,
-                                radius=64,
-                            ),
+                            build_avatar(avatar_url, radius=64),
                             ft.Container(
                                 content=ft.Container(
                                     content=ft.CircleAvatar(

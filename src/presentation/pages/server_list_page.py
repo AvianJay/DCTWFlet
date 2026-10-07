@@ -16,9 +16,8 @@ from domain.discovery.value_objects import (
 )
 from domain.discovery.entities import Server
 from infrastructure.api import ApiKeyMissingError, InvalidApiKeyError
-from infrastructure.config.constants import DEFAULT_AVATAR_URL
 from infrastructure.di import get_container
-from presentation.components import Toast
+from presentation.components import TagFilterDialog, Toast, build_avatar
 from presentation.tag_mappings import SERVER_TAGS, SERVER_TAG_FILTERS
 from presentation.url_helper import open_url
 
@@ -89,16 +88,13 @@ class ServerListPage:
             padding=ft.padding.only(bottom=10),
         )
 
-        # Tag filter state
+        # Tag filter state (multi-select, edited in the funnel dialog)
         self._selected_tags: set[str] = set()
-        self.tag_chips: dict[str, ft.Chip] = {}
-        self.tag_chips_row: Optional[ft.Row] = None
-        self.clear_tags_button = ft.TextButton(
-            "清除",
-            icon=ft.Icons.CLOSE,
-            tooltip="清除標籤篩選",
-            visible=False,
-            on_click=self._clear_tags,
+        self.filter_icon = ft.IconButton(
+            icon=ft.Icons.FILTER_ALT,
+            tooltip="篩選標籤",
+            icon_color=ft.Colors.ON_SURFACE_VARIANT,
+            on_click=self._open_tag_filter,
         )
 
     def build(self) -> ft.Control:
@@ -113,6 +109,7 @@ class ServerListPage:
                     bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST,
                     actions=[
                         self.search_icon,
+                        self.filter_icon,
                         ft.IconButton(
                             icon=ft.Icons.REFRESH,
                             tooltip="重新整理",
@@ -133,73 +130,51 @@ class ServerListPage:
                     ),
                     padding=15,
                 ),
-                self._build_tag_filter(),
                 self.progress,
                 ft.Container(self.server_list, expand=True),
             ],
             expand=True,
         )
 
-    def _build_tag_filter(self) -> ft.Control:
-        """Create the tag filter chips (same tags as the official website)."""
-        self.tag_chips_row = ft.Row(
-            [
-                self._create_tag_chip(name, *SERVER_TAGS[name])
-                for name in SERVER_TAG_FILTERS
-                if name in SERVER_TAGS
-            ],
-            spacing=6,
-            scroll=ft.ScrollMode.AUTO,
-            expand=True,
-        )
+    def _open_tag_filter(self, e=None) -> None:
+        """Open the funnel dialog that lists every official tag."""
+        TagFilterDialog(
+            self.page,
+            "篩選標籤",
+            SERVER_TAGS,
+            SERVER_TAG_FILTERS,
+            self._selected_tags,
+            self._apply_tags,
+        ).show()
 
-        return ft.Container(
-            content=ft.Row(
-                [self.tag_chips_row, self.clear_tags_button],
-                spacing=4,
-            ),
-            padding=ft.padding.only(left=15, right=15, bottom=6),
-        )
-
-    def _create_tag_chip(self, name: str, label: str, icon) -> ft.Chip:
-        chip = ft.Chip(
-            label=ft.Text(label, size=12),
-            leading=ft.Icon(icon, size=16),
-            selected=False,
-            show_checkmark=True,
-            on_select=lambda e, tag_name=name: self._on_tag_select(tag_name, e),
-        )
-        self.tag_chips[name] = chip
-        return chip
-
-    def _on_tag_select(self, name: str, e) -> None:
-        chip = self.tag_chips.get(name)
-        if chip is None:
-            return
-
-        chip.selected = not bool(chip.selected)
-        if chip.selected:
-            self._selected_tags.add(name)
-        else:
-            self._selected_tags.discard(name)
-
-        self.clear_tags_button.visible = bool(self._selected_tags)
-        self.tag_chips_row.update()
-        self.clear_tags_button.update()
+    def _apply_tags(self, selected: set[str]) -> None:
+        """Apply the selection made inside the funnel dialog."""
+        self._selected_tags = set(selected)
+        self._sync_filter_icon()
         self.page.run_task(self._load_servers)
 
-    def _clear_tags(self, e) -> None:
-        if not self._selected_tags:
-            return
-
-        self._selected_tags.clear()
-        for chip in self.tag_chips.values():
-            chip.selected = False
-
-        self.clear_tags_button.visible = False
-        self.tag_chips_row.update()
-        self.clear_tags_button.update()
-        self.page.run_task(self._load_servers)
+    def _sync_filter_icon(self) -> None:
+        """Show the active tag count on the funnel icon."""
+        count = len(self._selected_tags)
+        self.filter_icon.icon_color = (
+            ft.Colors.PRIMARY if count else ft.Colors.ON_SURFACE_VARIANT
+        )
+        self.filter_icon.tooltip = (
+            f"篩選標籤（已選 {count}）" if count else "篩選標籤"
+        )
+        self.filter_icon.badge = (
+            ft.Badge(
+                label=str(count),
+                bgcolor=ft.Colors.PRIMARY,
+                text_color=ft.Colors.ON_PRIMARY,
+            )
+            if count
+            else None
+        )
+        try:
+            self.filter_icon.update()
+        except Exception:
+            logger.debug("Filter icon is not mounted yet")
 
     def _toggle_search(self, e=None) -> None:
         """Show or hide the search box (opened from the magnifier icon)."""
@@ -375,12 +350,7 @@ class ServerListPage:
                     [
                         ft.Row(
                             [
-                                ft.CircleAvatar(
-                                    foreground_image_src=server.icon.value,
-                                    background_image_src=DEFAULT_AVATAR_URL,
-                                    bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST,
-                                    radius=25,
-                                ),
+                                build_avatar(server.icon.value, radius=25),
                                 ft.Column(
                                     [
                                         ft.Row(

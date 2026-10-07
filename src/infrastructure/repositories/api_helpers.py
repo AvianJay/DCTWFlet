@@ -12,8 +12,16 @@ DCTW_TIMEZONE = timezone(timedelta(hours=8))
 FALLBACK_AVATAR_URL = DEFAULT_AVATAR_URL
 
 # Relative paths the website uses as placeholders for items without an icon.
-# They are not served as real images, so they fall back to the default avatar.
-_PLACEHOLDER_PATHS = {"/guild-icon.png"}
+# The official site swaps them for its own placeholder icon, so the app shows
+# exactly the same picture instead of the site logo.
+PLACEHOLDER_AVATAR_URL = DCTW_API_BASE_URL.rstrip("/") + "/default-icon.png"
+
+_PLACEHOLDER_PATHS = {
+    "/icon.png",
+    "/default-icon.png",
+    "/guild-icon.png",
+    "/favicon.ico",
+}
 
 
 def normalize_url(value: Optional[str], fallback: str = "") -> str:
@@ -32,7 +40,7 @@ def normalize_url(value: Optional[str], fallback: str = "") -> str:
 
     if url.startswith("/"):
         if url.lower() in _PLACEHOLDER_PATHS:
-            return fallback
+            return PLACEHOLDER_AVATAR_URL
         return DCTW_API_BASE_URL.rstrip("/") + url
 
     if not url.startswith(("http://", "https://")):
