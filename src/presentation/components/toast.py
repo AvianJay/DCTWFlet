@@ -9,7 +9,7 @@ import flet as ft
 logger = logging.getLogger(__name__)
 
 DEFAULT_DURATION = 2.5
-DEFAULT_BOTTOM_MARGIN = 86
+DEFAULT_BOTTOM_MARGIN = 96
 
 
 class Toast:

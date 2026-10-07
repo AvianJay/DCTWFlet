@@ -78,6 +78,7 @@ class BotListPage:
         self._items: list[Bot] = []
         self._rendered_count = 0
         self._page_size = 30
+        self._load_seq = 0
         self._more_button = ft.Container(
             content=ft.TextButton(
                 "顯示更多",
@@ -205,6 +206,8 @@ class BotListPage:
 
     async def _load_bots(self):
         """Load list"""
+        self._load_seq += 1
+        seq = self._load_seq
         self.progress.visible = True
         self.page.update()
 
@@ -230,25 +233,34 @@ class BotListPage:
                 sort_option=sort_option,
             )
 
+            # A newer load started while this one was in flight: drop the
+            # stale result so the latest filter always wins.
+            if seq != self._load_seq:
+                return
+
             # Render list
             self._render_bot_list(bots)
 
         except ApiKeyMissingError:
-            self._render_message(
-                "尚未設定 API Key\n"
-                "請到「設定」頁面點擊「從剪貼簿貼上 API Key」。"
-            )
+            if seq == self._load_seq:
+                self._render_message(
+                    "尚未設定 API Key\n"
+                    "請到「設定」頁面點擊「從剪貼簿貼上 API Key」。"
+                )
         except InvalidApiKeyError:
-            self._render_message(
-                "API Key 無效或已失效\n"
-                "請到 DCTW 後台重新複製 API KEY，再到「設定」頁面貼上。"
-            )
+            if seq == self._load_seq:
+                self._render_message(
+                    "API Key 無效或已失效\n"
+                    "請到 DCTW 後台重新複製 API KEY，再到「設定」頁面貼上。"
+                )
         except Exception as e:
-            self._render_message(f"載入失敗: {str(e)}")
+            if seq == self._load_seq:
+                self._render_message(f"載入失敗: {str(e)}")
 
         finally:
-            self.progress.visible = False
-            self.page.update()
+            if seq == self._load_seq:
+                self.progress.visible = False
+                self.page.update()
 
     def _render_bot_list(self, bots: list[Bot]):
         """Render the first page of the list"""
@@ -257,17 +269,64 @@ class BotListPage:
         self.bot_list.controls.clear()
 
         if not self._items:
-            self.bot_list.controls.append(
-                ft.Container(
-                    content=ft.Text("找不到機器人 :(", size=16, color=ft.Colors.GREY),
-                    alignment=ft.Alignment(0, 0),
-                    padding=50,
-                )
-            )
+            self.bot_list.controls.append(self._create_empty_state())
         else:
             self._append_bot_page()
 
         self.page.update()
+
+    def _has_active_filter(self) -> bool:
+        """Is a tag filter or a search text currently applied?"""
+        return bool(self._selected_tags) or bool(
+            (self.search_field.value or "").strip()
+        )
+
+    def _create_empty_state(self) -> ft.Control:
+        """Friendly placeholder shown when nothing can be displayed."""
+        active = self._has_active_filter()
+        children: list[ft.Control] = [
+            ft.Icon(
+                ft.Icons.SEARCH_OFF, size=44, color=ft.Colors.ON_SURFACE_VARIANT
+            ),
+            ft.Text(
+                "沒有符合條件的機器人",
+                size=16,
+                weight=ft.FontWeight.BOLD,
+            ),
+            ft.Text(
+                "試著調整搜尋文字或改用其他標籤。"
+                if active
+                else "目前沒有可顯示的機器人，請稍後再試。",
+                size=13,
+                color=ft.Colors.ON_SURFACE_VARIANT,
+                text_align=ft.TextAlign.CENTER,
+            ),
+        ]
+        if active:
+            children.append(
+                ft.FilledButton(
+                    "清除篩選",
+                    icon=ft.Icons.FILTER_ALT_OFF,
+                    on_click=lambda _: self.page.run_task(self._clear_filters),
+                )
+            )
+        return ft.Container(
+            content=ft.Column(
+                children,
+                spacing=8,
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            ),
+            alignment=ft.Alignment(0, 0),
+            padding=ft.padding.symmetric(vertical=60, horizontal=24),
+        )
+
+    async def _clear_filters(self) -> None:
+        """Reset the search text and the tag selection, then reload."""
+        self._selected_tags.clear()
+        if self.search_field.value:
+            self.search_field.value = ""
+        self._sync_filter_icon()
+        await self._load_bots()
 
     def _append_bot_page(self):
         """Append the next page of bots to the list"""
