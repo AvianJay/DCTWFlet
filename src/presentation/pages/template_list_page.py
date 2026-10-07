@@ -48,7 +48,7 @@ class TemplateListPage:
             on_scroll=self._on_list_scroll,
         )
         self.search_field = ft.TextField(
-            label="搜尋模板...",
+            hint_text="搜尋模板...",
             prefix_icon=ft.Icons.SEARCH,
             on_submit=lambda _: self.page.run_task(self._on_search),
         )
@@ -62,6 +62,14 @@ class TemplateListPage:
             value="default",
             width=150,
             on_select=lambda _: self.page.run_task(self._load_templates),
+        )
+        self.search_icon = ft.IconButton(
+            icon=ft.Icons.SEARCH,
+            tooltip="搜尋",
+            on_click=self._toggle_search,
+        )
+        self.search_box = ft.Container(
+            self.search_field, expand=True, visible=False
         )
 
         self.progress = ft.ProgressBar(visible=False)
@@ -102,6 +110,7 @@ class TemplateListPage:
                     center_title=False,
                     bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST,
                     actions=[
+                        self.search_icon,
                         ft.IconButton(
                             icon=ft.Icons.REFRESH,
                             tooltip="重新整理",
@@ -112,12 +121,13 @@ class TemplateListPage:
                 ft.Container(
                     content=ft.Row(
                         [
-                            ft.Container(self.search_field, expand=True),
+                            self.search_box,
                             self.sort_dropdown,
                         ],
                         spacing=10,
                         wrap=False,
                         run_spacing=10,
+                        alignment=ft.MainAxisAlignment.END,
                     ),
                     padding=10,
                 ),
@@ -187,6 +197,23 @@ class TemplateListPage:
         self.clear_tags_button.visible = False
         self.tag_chips_row.update()
         self.clear_tags_button.update()
+        self.page.run_task(self._load_templates)
+
+    def _toggle_search(self, e=None) -> None:
+        """Show or hide the search box (opened from the magnifier icon)."""
+        self.search_box.visible = not self.search_box.visible
+        if self.search_box.visible:
+            self.search_icon.icon = ft.Icons.CLOSE
+            self.search_box.update()
+            self.search_icon.update()
+            self.page.run_task(self.search_field.focus)
+            return
+
+        self.search_icon.icon = ft.Icons.SEARCH
+        if self.search_field.value:
+            self.search_field.value = ""
+        self.search_box.update()
+        self.search_icon.update()
         self.page.run_task(self._load_templates)
 
     async def _refresh(self) -> None:
