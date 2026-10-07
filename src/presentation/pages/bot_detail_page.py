@@ -9,7 +9,11 @@ from domain.shared import EntityNotFoundException
 from infrastructure.di import get_container
 from infrastructure.api import DctwApiClient
 from infrastructure.image import ImageServer
-from presentation.components import VoteButton, build_avatar
+from presentation.components import (
+    VoteButton,
+    build_avatar,
+    build_social_links_section,
+)
 from presentation.tag_mappings import BOT_TAGS
 from presentation.url_helper import open_url
 
@@ -189,6 +193,8 @@ class BotDetailPage:
                 self._create_tags_section(bot),
                 # Action buttons (Invite, Support Server, Website)
                 self._create_action_buttons(bot),
+                # Social links (same platforms as the official page)
+                self._create_social_links_section(bot),
                 # Introduction (Markdown)
                 ft.Container(
                     content=ft.Markdown(
@@ -462,6 +468,13 @@ class BotDetailPage:
             alignment=ft.Alignment(0, 0),
             padding=ft.padding.symmetric(horizontal=20),
         )
+
+    def _create_social_links_section(self, bot: Bot) -> ft.Control:
+        """Create the social links block shown on the official page."""
+        section = build_social_links_section(
+            self.page, bot.social_links, self._cache_image
+        )
+        return section if section is not None else ft.Container(height=0)
 
     def _create_statistics_section(self, bot: Bot) -> ft.Control:
         """Create statistics section"""

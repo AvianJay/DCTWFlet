@@ -1,6 +1,6 @@
 """Template entity"""
 
-from typing import List
+from typing import Dict, List, Optional
 from dataclasses import dataclass
 from domain.shared import Entity
 from ..value_objects import (
@@ -34,6 +34,7 @@ class Template(Entity[int]):
         links: TemplateLinks,
         timestamps: Timestamps,
         pinned: bool = False,
+        social_links: Optional[Dict[str, str]] = None,
     ):
         super().__init__(id)
         self._validate_name(name)
@@ -47,6 +48,7 @@ class Template(Entity[int]):
         self._links = links
         self._timestamps = timestamps
         self._pinned = pinned
+        self._social_links = dict(social_links or {})
 
     @property
     def name(self) -> str:
@@ -79,6 +81,10 @@ class Template(Entity[int]):
     @property
     def links(self) -> TemplateLinks:
         return self._links
+
+    @property
+    def social_links(self) -> Dict[str, str]:
+        return dict(self._social_links)
 
     @property
     def timestamps(self) -> Timestamps:

@@ -24,6 +24,7 @@ from .api_helpers import (
     normalize_url,
     parse_author_ids,
     parse_datetime,
+    parse_social_links,
     parse_tag_list,
     to_bool,
 )
@@ -274,6 +275,7 @@ class DctwBotRepository(BotRepository):
             banner=BannerUrl(banner_url) if banner_url else None,
             pinned=to_bool(data.get("pinned", False)),
             author_ids=author_ids,
+            social_links=parse_social_links(data.get("socialLinks")),
         )
 
     def _serialize_bot(self, bot: Bot) -> dict:
@@ -296,6 +298,7 @@ class DctwBotRepository(BotRepository):
             "server_url": bot.links.support_server,
             "web_url": bot.links.website,
             "author_ids": bot.author_ids,
+            "socialLinks": bot.social_links,
             "created_at": bot.timestamps.created_at.isoformat(),
             "bumped_at": bot.timestamps.bumped_at.isoformat(),
             "pinned": bot.pinned,

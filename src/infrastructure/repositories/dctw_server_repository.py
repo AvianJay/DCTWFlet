@@ -21,6 +21,7 @@ from .api_helpers import (
     normalize_optional_url,
     normalize_url,
     parse_datetime,
+    parse_social_links,
     parse_tag_list,
     to_bool,
 )
@@ -140,6 +141,7 @@ class DctwServerRepository(ServerRepository):
             ),
             banner=BannerUrl(banner_url) if banner_url else None,
             pinned=to_bool(data.get("pinned", False)),
+            social_links=parse_social_links(data.get("socialLinks")),
         )
 
     @staticmethod
@@ -170,6 +172,7 @@ class DctwServerRepository(ServerRepository):
             "created_at": server.timestamps.created_at.isoformat(),
             "bumped_at": server.timestamps.bumped_at.isoformat(),
             "pinned": server.pinned,
+            "socialLinks": server.social_links,
         }
 
     def _deserialize_server(self, data: dict) -> Server:

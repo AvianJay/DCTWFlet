@@ -31,11 +31,12 @@ class InvalidApiKeyError(DctwApiError):
 
 
 class DctwApiClient:
-    """DCTW API v2 client.
+    """DCTW API client.
 
-    All API v2 endpoints require an API key sent as a Bearer token.
-    Users get their key by logging in with Discord on https://dctw.xyz
-    and copying it from the dashboard.
+    The list and detail endpoints (API v1) answer without authentication,
+    while API v2 endpoints (voting, key validation) need an API key sent as
+    a Bearer token. Users copy the key from the DCTW dashboard
+    (https://dctw.xyz) and paste it into the app from the clipboard.
     """
 
     DEFAULT_BASE_URL = DCTW_API_BASE_URL
@@ -253,6 +254,10 @@ class DctwApiClient:
         while the vote cooldown is still active), so callers must check the
         ok flag of the returned body instead of the status code.
 
+        Voting needs an API key. When none is stored (or the stored key was
+        rejected) the result carries a ``needs_key`` flag so the caller can
+        ask the user to paste one from the clipboard.
+
         Returns:
             The response body, e.g. {"ok": True, "message": "已成功投票！"}.
         """
@@ -260,7 +265,7 @@ class DctwApiClient:
         if collection is None:
             raise ValueError(f"Unsupported item type: {item_type}")
 
-        api_key = await self._require_api_key()
+        api_key = await self._load_runtime_api_key()
         endpoint = f"{self._api_v2_prefix}/{collection}/{item_id}/vote"
 
         try:
@@ -268,6 +273,12 @@ class DctwApiClient:
                 self._base_url, headers=self._build_headers(api_key)
             ) as client:
                 response = await self._request(client, "POST", endpoint)
+        except InvalidApiKeyError:
+            return {
+                "ok": False,
+                "needs_key": True,
+                "message": "投票需要 DCTW API Key，請從剪貼簿貼上有效的 API Key。",
+            }
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
                 return {
@@ -282,7 +293,8 @@ class DctwApiClient:
         return {"ok": False, "message": "投票失敗：API 回應格式不正確。"}
 
     async def _get_collection(self, endpoint: str) -> List[Dict[str, Any]]:
-        api_key = await self._require_api_key()
+        # API v1 is public: a stored key is only sent when one exists.
+        api_key = await self._load_runtime_api_key()
         items: List[Dict[str, Any]] = []
         cursor: Optional[str] = None
 
@@ -304,7 +316,7 @@ class DctwApiClient:
 
     async def _get_item(self, endpoint: str) -> Optional[Dict[str, Any]]:
         """Fetch a single resource. Returns None when the API answers 404."""
-        api_key = await self._require_api_key()
+        api_key = await self._load_runtime_api_key()
 
         async with AsyncHttpClient(
             self._base_url, headers=self._build_headers(api_key)
@@ -338,7 +350,7 @@ class DctwApiClient:
         except httpx.HTTPStatusError as e:
             if e.response.status_code in (401, 403):
                 raise InvalidApiKeyError(
-                    "DCTW API Key 無效或已失效，請重新登入取得新的 API Key。"
+                    "DCTW API Key 無效或已失效，請到「設定」重新從剪貼簿貼上 API Key。"
                 ) from e
             raise
 
@@ -346,16 +358,18 @@ class DctwApiClient:
         api_key = await self._load_runtime_api_key()
         if not api_key:
             raise ApiKeyMissingError(
-                "尚未設定 DCTW API Key，請使用 Discord 登入取得 API Key。"
+                "尚未設定 DCTW API Key，請到「設定」從剪貼簿貼上 API Key。"
             )
         return api_key
 
-    def _build_headers(self, api_key: str) -> Dict[str, str]:
-        return {
-            "Authorization": f"Bearer {api_key}",
+    def _build_headers(self, api_key: Optional[str]) -> Dict[str, str]:
+        headers = {
             "Content-Type": "application/json",
             "User-Agent": self._user_agent,
         }
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        return headers
 
     async def _load_runtime_api_key(self) -> Optional[str]:
         if self._config_storage is not None:

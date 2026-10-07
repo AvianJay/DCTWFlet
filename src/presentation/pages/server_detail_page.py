@@ -9,7 +9,11 @@ from domain.shared import EntityNotFoundException
 from infrastructure.api import DctwApiClient
 from infrastructure.di import get_container
 from infrastructure.image import ImageServer
-from presentation.components import VoteButton, build_avatar
+from presentation.components import (
+    VoteButton,
+    build_avatar,
+    build_social_links_section,
+)
 from presentation.tag_mappings import SERVER_TAGS
 from presentation.url_helper import open_url
 
@@ -135,6 +139,8 @@ class ServerDetailPage:
                 self._create_tags_section(server),
                 # Action buttons
                 self._create_action_buttons(server),
+                # Social links (same platforms as the official page)
+                self._create_social_links_section(server),
                 # Introduction (Markdown)
                 ft.Container(
                     content=ft.Markdown(
@@ -165,6 +171,13 @@ class ServerDetailPage:
 
         self._content_container.content = detail_view
         self.page.update()
+
+    def _create_social_links_section(self, server: Server) -> ft.Control:
+        """Create the social links block shown on the official page."""
+        section = build_social_links_section(
+            self.page, server.social_links, self._cache_image
+        )
+        return section if section is not None else ft.Container(height=0)
 
     def _create_header_section(self, server: Server) -> ft.Control:
         """Create header section with banner and icon"""

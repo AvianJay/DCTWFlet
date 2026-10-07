@@ -130,6 +130,51 @@ def parse_author_ids(data: dict) -> list[str]:
     return ids
 
 
+# Platforms shown on the official detail pages, in the same order.
+SOCIAL_PLATFORMS = ("Line", "Facebook", "Instagram", "Twitch", "Threads", "X")
+
+
+def parse_social_links(value) -> dict[str, str]:
+    """Return the social links of an API item as a platform -> URL mapping.
+
+    The API stores socialLinks as a JSON string and uses empty strings or
+    the literal "None" for platforms that were left blank. Just like the
+    official website only entries with a http(s) URL are kept.
+    """
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return {}
+        try:
+            parsed = json.loads(text)
+        except ValueError:
+            return {}
+        value = parsed
+
+    if not isinstance(value, dict):
+        return {}
+
+    links: dict[str, str] = {}
+    for platform, url in value.items():
+        if not isinstance(platform, str) or not isinstance(url, str):
+            continue
+        url = url.strip()
+        if not url or url.lower() == "none":
+            continue
+        if not url.startswith(("http://", "https://")):
+            continue
+        links[platform] = url
+
+    ordered: dict[str, str] = {
+        platform: links[platform]
+        for platform in SOCIAL_PLATFORMS
+        if platform in links
+    }
+    for platform, url in links.items():
+        ordered.setdefault(platform, url)
+    return ordered
+
+
 def is_listed_item(data: dict) -> bool:
     """Return whether the website shows the item in its lists.
 

@@ -1,8 +1,8 @@
-"""DCTW API key helpers.
+"""DCTW API key dialog.
 
-The API key can be fetched automatically with the in-app Discord login or
-copied from the DCTW dashboard (after logging in on https://dctw.xyz) and
-pasted into the app from the clipboard.
+The API key is copied from the DCTW dashboard (after logging in on
+https://dctw.xyz) and pasted into the app from the clipboard. It is only
+needed for voting; browsing bots, servers and templates works without it.
 """
 
 import asyncio
@@ -29,15 +29,17 @@ class ApiKeyDialog:
         discovery_service: DiscoveryService,
         api_client: DctwApiClient,
         on_saved: Optional[Callable[[], None]] = None,
+        on_close: Optional[Callable[[], None]] = None,
     ):
         self.page = page
         self._preferences = preference_service
         self._discovery = discovery_service
         self._api_client = api_client
         self._on_saved = on_saved
+        self._on_close = on_close
 
         self._dialog: Optional[ft.AlertDialog] = None
-        self._status = ft.Text("請先複製 API KEY，再點擊下方按鈕。", size=13)
+        self._status = ft.Text("請先在 DCTW 後台複製 API KEY，再點擊下方按鈕。", size=13)
         self._progress = ft.ProgressRing(
             width=18, height=18, stroke_width=2, visible=False
         )
@@ -48,11 +50,6 @@ class ApiKeyDialog:
         """Show the API key dialog."""
         actions = [
             ft.FilledButton(
-                "使用 Discord 登入",
-                icon=ft.Icons.LOGIN,
-                on_click=self._on_login,
-            ),
-            ft.OutlinedButton(
                 "從剪貼簿貼上",
                 icon=ft.Icons.CONTENT_PASTE,
                 on_click=self._on_paste,
@@ -72,13 +69,12 @@ class ApiKeyDialog:
             ),
             content=ft.Column(
                 [
+                    ft.Text("瀏覽資料不需要登入；投票時才需要 DCTW API Key。", size=14),
+                    ft.Text("1. 到 DCTW 官網登入後，在後台複製 API KEY。", size=13),
                     ft.Text(
-                        "DCTW API 需要 API Key 才能取得資料，取得方式：",
-                        size=14,
+                        "2. 回到應用程式點擊「從剪貼簿貼上」，會自動驗證並儲存。",
+                        size=13,
                     ),
-                    ft.Text("1. 點擊下方「使用 Discord 登入」在應用程式內完成登入", size=13),
-                    ft.Text("2. API Key 會自動填入，不需要手動複製", size=13),
-                    ft.Text("3. 也可以到 DCTW 後台複製 API KEY 後再貼上", size=13),
                     ft.Divider(height=12),
                     ft.Row(
                         [self._progress, self._status],
@@ -100,24 +96,16 @@ class ApiKeyDialog:
         except Exception:
             logger.exception("Failed to close API key dialog")
 
+        if self._on_close is not None:
+            try:
+                self._on_close()
+            except Exception:
+                logger.exception("API key dialog close callback failed")
+
     # -------------------------------------------------------------- events
 
     def _on_paste(self, _e) -> None:
         self.page.run_task(self._paste_from_clipboard)
-
-    def _on_login(self, _e) -> None:
-        """Open the in-app Discord login and store the key automatically."""
-        from .discord_login_dialog import DiscordLoginDialog
-
-        self._close()
-        dialog = DiscordLoginDialog(
-            page=self.page,
-            preference_service=self._preferences,
-            discovery_service=self._discovery,
-            api_client=self._api_client,
-            on_saved=self._on_saved,
-        )
-        dialog.show()
 
     async def _paste_from_clipboard(self) -> None:
         self._set_status("正在從剪貼簿讀取並驗證 API Key…", busy=True)

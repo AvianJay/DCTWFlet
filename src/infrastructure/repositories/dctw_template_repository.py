@@ -16,6 +16,7 @@ from .api_helpers import (
     is_listed_item,
     normalize_url,
     parse_datetime,
+    parse_social_links,
     parse_tag_list,
     to_bool,
 )
@@ -113,6 +114,7 @@ class DctwTemplateRepository(TemplateRepository):
                 ),
             ),
             pinned=to_bool(data.get("pinned", False)),
+            social_links=parse_social_links(data.get("socialLinks")),
         )
 
     def _serialize_template(self, template: Template) -> dict:
@@ -128,6 +130,7 @@ class DctwTemplateRepository(TemplateRepository):
             "share_url": template.links.share_url,
             "created_at": template.timestamps.created_at.isoformat(),
             "bumped_at": template.timestamps.bumped_at.isoformat(),
+            "socialLinks": template.social_links,
         }
 
     def _deserialize_template(self, data: dict) -> Template:

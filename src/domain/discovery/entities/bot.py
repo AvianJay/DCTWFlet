@@ -1,6 +1,6 @@
 """Bot entity"""
 
-from typing import List, Optional
+from typing import Dict, List, Optional
 from dataclasses import dataclass, field
 from domain.shared import Entity
 from ..value_objects import (
@@ -63,6 +63,7 @@ class Bot(Entity[int]):
         banner: Optional[BannerUrl] = None,
         pinned: bool = False,
         author_ids: Optional[List[str]] = None,
+        social_links: Optional[Dict[str, str]] = None,
     ):
         super().__init__(id)
         self._validate_name(name)
@@ -81,6 +82,7 @@ class Bot(Entity[int]):
         self._timestamps = timestamps
         self._pinned = pinned
         self._author_ids = list(author_ids or [])
+        self._social_links = dict(social_links or {})
 
     @property
     def name(self) -> str:
@@ -93,6 +95,10 @@ class Bot(Entity[int]):
     @property
     def author_ids(self) -> List[str]:
         return self._author_ids.copy()
+
+    @property
+    def social_links(self) -> Dict[str, str]:
+        return dict(self._social_links)
 
     @property
     def avatar(self) -> AvatarUrl:
