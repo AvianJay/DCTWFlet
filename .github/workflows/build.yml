@@ -47,19 +47,29 @@ jobs:
         run: |
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "$KEYSTORE_BASE64" | base64 --decode > sign.jks
-            echo "SIGN_ARGS=--android-signing-key-store $PWD/sign.jks --android-signing-key-store-password $KEYSTORE_PASSWORD --android-signing-key-password $KEYSTORE_PASSWORD --android-signing-key-alias $KEY_ALIAS" >> "$GITHUB_ENV"
           else
             echo "KEYSTORE_BASE64 is not set - the APK will be debug-signed (not release-signed)."
-            echo "SIGN_ARGS=" >> "$GITHUB_ENV"
           fi
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
 
       - name: Build APK
         run: |
-          poetry run flet build apk --verbose --no-rich-output --compile-app --compile-packages $SIGN_ARGS --build-version "$COMMIT_HASH" --yes
+          # Every signing value stays its own quoted argument: passwords and
+          # aliases may contain spaces that an unquoted string would split.
+          sign_args=()
+          if [ -f sign.jks ]; then
+            sign_args=(
+              --android-signing-key-store "$PWD/sign.jks"
+              --android-signing-key-store-password "$KEYSTORE_PASSWORD"
+              --android-signing-key-password "$KEYSTORE_PASSWORD"
+              --android-signing-key-alias "$KEY_ALIAS"
+            )
+          fi
+          poetry run flet build apk --verbose --no-rich-output --compile-app --compile-packages "${sign_args[@]}" --build-version "$COMMIT_HASH" --yes
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -96,19 +106,29 @@ jobs:
         run: |
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "$KEYSTORE_BASE64" | base64 --decode > sign.jks
-            echo "SIGN_ARGS=--android-signing-key-store $PWD/sign.jks --android-signing-key-store-password $KEYSTORE_PASSWORD --android-signing-key-password $KEYSTORE_PASSWORD --android-signing-key-alias $KEY_ALIAS" >> "$GITHUB_ENV"
           else
             echo "KEYSTORE_BASE64 is not set - the AAB will be debug-signed (not release-signed)."
-            echo "SIGN_ARGS=" >> "$GITHUB_ENV"
           fi
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
 
       - name: Build AAB
         run: |
-          poetry run flet build aab --verbose --no-rich-output --compile-app --compile-packages $SIGN_ARGS --build-version "$COMMIT_HASH" --yes
+          # Every signing value stays its own quoted argument: passwords and
+          # aliases may contain spaces that an unquoted string would split.
+          sign_args=()
+          if [ -f sign.jks ]; then
+            sign_args=(
+              --android-signing-key-store "$PWD/sign.jks"
+              --android-signing-key-store-password "$KEYSTORE_PASSWORD"
+              --android-signing-key-password "$KEYSTORE_PASSWORD"
+              --android-signing-key-alias "$KEY_ALIAS"
+            )
+          fi
+          poetry run flet build aab --verbose --no-rich-output --compile-app --compile-packages "${sign_args[@]}" --build-version "$COMMIT_HASH" --yes
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4
@@ -323,8 +343,10 @@ jobs:
 
   deploy:
     needs: build-web  # wait for the "build" job to get done before executing this "deploy" job
-    # GitHub Pages is only configured on the upstream repository.
-    if: github.repository == 'AvianJay/DCTWFlet'
+    # GitHub Pages is only configured on the upstream repository, and a pull
+    # request ref is not allowed to use the github-pages environment, so the
+    # job only runs for pushes to that repository.
+    if: github.repository == 'AvianJay/DCTWFlet' && github.event_name == 'push'
 
     runs-on: ubuntu-latest
 

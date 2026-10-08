@@ -24,17 +24,33 @@ class Toast:
         self.page = page
         self.duration = duration
         self.bottom = bottom
-        self._box: Optional[ft.Container] = None
+        # Every display owns its controls and the task that shows them, so a
+        # task that is replaced by a newer message can only remove the box it
+        # created itself.
+        self._task = None
         self._host: Optional[ft.Container] = None
 
     def show(self, message: str, duration: Optional[float] = None) -> None:
         """Display a message and hide it again after a few seconds."""
-        self.page.run_task(self._show, message, duration or self.duration)
+        self._cancel_previous()
+        self._task = self.page.run_task(
+            self._show, message, duration or self.duration
+        )
+
+    def _cancel_previous(self) -> None:
+        """Stop the message that is currently on screen (if any)."""
+        task = self._task
+        self._task = None
+        if task is None or task.done():
+            return
+
+        try:
+            task.cancel()
+        except Exception:
+            logger.exception("Failed to cancel the previous toast message")
 
     async def _show(self, message: str, duration: float) -> None:
-        self._remove()
-
-        self._box = ft.Container(
+        box = ft.Container(
             content=ft.Text(
                 message,
                 size=13,
@@ -53,45 +69,47 @@ class Toast:
             animate_opacity=ft.Animation(200, ft.AnimationCurve.EASE_OUT),
         )
 
-        self._host = ft.Container(
-            content=self._box,
+        host = ft.Container(
+            content=box,
             left=0,
             right=0,
             bottom=self.bottom,
             alignment=ft.Alignment(0, 0),
             ignore_interactions=True,
         )
+        self._host = host
 
         try:
-            self.page.overlay.append(self._host)
+            self.page.overlay.append(host)
             self.page.update()
 
             await asyncio.sleep(0.05)
-            self._box.opacity = 1
+            box.opacity = 1
             self.page.update()
 
             await asyncio.sleep(duration)
 
-            self._box.opacity = 0
+            box.opacity = 0
             self.page.update()
             await asyncio.sleep(0.25)
         except Exception:
             logger.exception("Failed to show toast message")
         finally:
-            self._remove()
+            self._remove(host)
 
-    def _remove(self) -> None:
-        if self._host is None:
+    def _remove(self, host: Optional[ft.Container]) -> None:
+        """Remove one message box; a newer display keeps its own box."""
+        if host is None:
             return
 
         try:
-            if self._host in self.page.overlay:
-                self.page.overlay.remove(self._host)
+            if host in self.page.overlay:
+                self.page.overlay.remove(host)
         except Exception:
             logger.exception("Failed to remove toast message")
 
-        self._host = None
-        self._box = None
+        if self._host is host:
+            self._host = None
 
         try:
             self.page.update()

@@ -196,6 +196,10 @@ class SettingsPage:
             enabled = e.control.value
             await self.pref_service.set_nsfw(enabled)
 
+            # The loaded lists were filtered with the previous preference, so
+            # the shell rebuilds them and they reload with the new one.
+            self._notify_data_changed()
+
             status = "已啟用" if enabled else "已禁用"
             self._show_success(f"NSFW過濾{status}")
 
