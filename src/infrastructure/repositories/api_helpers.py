@@ -206,7 +206,9 @@ def parse_comments(value) -> list[Comment]:
 
     Reviews are embedded in the item itself (``comments``); the separate
     ``/comments/`` endpoints answer 404, so the single item endpoint is the
-    source of truth used by the website as well.
+    source of truth used by the website as well. The official website only
+    renders reviews that have text, so rating-only entries are dropped here
+    as well to keep the app in sync with the website.
     """
     if isinstance(value, str):
         text = value.strip()
@@ -225,6 +227,10 @@ def parse_comments(value) -> list[Comment]:
         if not isinstance(item, dict):
             continue
 
+        content = str(item.get("content") or "").strip()
+        if not content:
+            continue
+
         try:
             stars = int(item.get("stars") or 0)
         except (TypeError, ValueError):
@@ -236,7 +242,7 @@ def parse_comments(value) -> list[Comment]:
                     item.get("userId") or item.get("user_id") or ""
                 ).strip(),
                 stars=max(0, min(5, stars)),
-                content=str(item.get("content") or "").strip(),
+                content=content,
                 created_at=parse_datetime(item.get("created_at")),
                 edited=to_bool(item.get("edited", False)),
             )

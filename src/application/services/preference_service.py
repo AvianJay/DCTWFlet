@@ -54,21 +54,6 @@ class PreferenceService:
         self._current.update_api_key(ApiKey(api_key))
         await self.save_preferences()
 
-    async def update_dctw_user(self, user_id: str, user_name: str) -> None:
-        """Remember the DCTW account that signed in for reviews"""
-        if not self._current:
-            await self.load_preferences()
-
-        if (
-            self._current.dctw_user_id == str(user_id or "")
-            and self._current.dctw_user_name == str(user_name or "")
-        ):
-            return
-
-        logger.info("Updating the signed in DCTW user")
-        self._current.set_dctw_user(user_id, user_name)
-        await self.save_preferences()
-
     async def toggle_nsfw(self) -> bool:
         """Toggle NSFW filter"""
         if not self._current:

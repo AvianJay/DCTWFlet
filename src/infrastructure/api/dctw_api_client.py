@@ -48,30 +48,13 @@ class DctwApiClient:
     # (bot authors) to their public profile.
     GET_USERS_ACTION = "40d2eecba887e6edbe579ce1858b12b97b66aa318d"
 
-    # Review server actions of the official website. They only accept the
-    # login session of the site (an API key is rejected), so a review is
-    # sent from a WebView that carries that session - see
-    # ``presentation.components.DctwCommentDialog``. Reading the list works
-    # from here as well, which is used to refresh the section.
-    COMMENT_ACTIONS: Dict[str, Dict[str, str]] = {
-        "bots": {
-            "insert": "78013e5bf60090c84bf81e63fbea7775435577a5e6",
-            "edit": "70990886808596af207d6d8ec3d905a4312b106c70",
-            "delete": "603605aa61fe75fe3cd07fd291415003e35c391943",
-            "list": "404bfb2f51e44d89bd0ccd5ebce31a4498780e1e59",
-        },
-        "servers": {
-            "insert": "7892376f97e24bdd8c74c2d89ebdf41c270c32cc5e",
-            "edit": "7008cf95b2f13fbe656662227dde0a74c9da493c32",
-            "delete": "601364561c331aba7550224175633a1e0d1c4a5f4a",
-            "list": "409de9f637fd530bbbfc1bfa7e6790c61e6eda895e",
-        },
-        "templates": {
-            "insert": "7801357d9e514f52097b383ae3f4c1d0f58c9cf72a",
-            "edit": "70ca1e37e3ced2efae0fcc54560427cd9e06d27507",
-            "delete": "6003050bc14630fcedc9d735c05930fbecd9280be2",
-            "list": "4066734a6de5dc79145de79a9942369ef89eaccf4a",
-        },
+    # Server action the official website uses to read the review list of an
+    # item. Writing a review only works with the login session of the site
+    # (an API key is rejected), so the app only reads the list.
+    COMMENT_LIST_ACTIONS: Dict[str, str] = {
+        "bots": "404bfb2f51e44d89bd0ccd5ebce31a4498780e1e59",
+        "servers": "409de9f637fd530bbbfc1bfa7e6790c61e6eda895e",
+        "templates": "4066734a6de5dc79145de79a9942369ef89eaccf4a",
     }
 
     # Server action used by the official website to read a single bot record
@@ -154,9 +137,9 @@ class DctwApiClient:
         return await self._get_collection(f"/bots/{bot_id}/comments/")
 
     @classmethod
-    def comment_actions(cls, item_type: str) -> Dict[str, str]:
-        """Return the review server actions of one item type."""
-        return dict(cls.COMMENT_ACTIONS.get(str(item_type or "").strip().lower(), {}))
+    def comment_list_action(cls, item_type: str) -> str:
+        """Return the review list server action of one item type."""
+        return cls.COMMENT_LIST_ACTIONS.get(str(item_type or "").strip().lower(), "")
 
     async def get_comments(
         self, item_type: str, item_id: Union[int, str]
@@ -164,11 +147,10 @@ class DctwApiClient:
         """Read the reviews of an item through the website's own action.
 
         The public API embeds the reviews in the item itself, but the
-        website reads and refreshes them with a server action, so a review
-        that was just sent shows up here right away.
+        website reads them with a server action; reading that same list
+        keeps the app in sync with the website.
         """
-        actions = self.comment_actions(item_type)
-        action_id = actions.get("list")
+        action_id = self.comment_list_action(item_type)
         if not action_id:
             return []
 
