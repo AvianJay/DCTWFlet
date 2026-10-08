@@ -74,6 +74,7 @@ class CommentsSection:
         self._profiles: Dict[str, UserProfile] = {}
 
         self._stars = 5
+        self._had_own_comment = False
         self._star_icons: List[ft.Icon] = []
         self._content_field = ft.TextField(
             hint_text=CONTENT_HINT,
@@ -220,6 +221,10 @@ class CommentsSection:
         if mine is not None:
             self._stars = max(1, min(5, int(mine.stars or 0)))
             self._content_field.value = mine.content or ""
+        elif self._had_own_comment:
+            self._stars = 5
+            self._content_field.value = ""
+        self._had_own_comment = mine is not None
 
         self._star_icons = []
         stars: List[ft.Control] = []
