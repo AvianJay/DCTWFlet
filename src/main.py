@@ -363,27 +363,39 @@ async def main(page: ft.Page):
             padding=0,
         )
 
+    # The home view is created only once. Keeping the same view mounted below a
+    # detail page preserves the loaded lists (and their scroll position) when
+    # the detail page is closed.
+    home_view = create_home_view()
+
+    def _reset_to_home() -> None:
+        """Drop every pushed detail view, keeping the live home view."""
+        if page.views and page.views[0] is home_view:
+            del page.views[1:]
+            return
+        page.views.clear()
+        page.views.append(home_view)
+
     def route_change(e):
         try:
-            logger.info("Route change: %s", page.route)
-            page.views.clear()
+            route = page.route or "/"
+            logger.info("Route change: %s", route)
 
-            if page.route in ("", "/"):
-                page.views.append(create_home_view())
-            elif page.route.startswith("/bot/"):
-                bot_id = page.route.split("/bot/")[1]
-                page.views.append(create_home_view())
-                page.views.append(create_bot_detail_view(bot_id))
-            elif page.route.startswith("/server/"):
-                server_id = page.route.split("/server/")[1]
-                page.views.append(create_home_view())
-                page.views.append(create_server_detail_view(server_id))
-            elif page.route.startswith("/template/"):
-                template_id = page.route.split("/template/")[1]
-                page.views.append(create_home_view())
-                page.views.append(create_template_detail_view(template_id))
+            if route.startswith("/bot/"):
+                _reset_to_home()
+                page.views.append(create_bot_detail_view(route.split("/bot/")[1]))
+            elif route.startswith("/server/"):
+                _reset_to_home()
+                page.views.append(
+                    create_server_detail_view(route.split("/server/")[1])
+                )
+            elif route.startswith("/template/"):
+                _reset_to_home()
+                page.views.append(
+                    create_template_detail_view(route.split("/template/")[1])
+                )
             else:
-                page.views.append(create_home_view())
+                _reset_to_home()
 
             logger.info("Views rendered: %s", len(page.views))
             page.update()
@@ -423,8 +435,9 @@ async def main(page: ft.Page):
             page.update()
 
     def view_pop(e):
-        page.views.pop()
-        top_view = page.views[-1]
+        if len(page.views) > 1:
+            page.views.pop()
+        top_view = page.views[-1] if page.views else home_view
         navigate(top_view.route)
 
     page.on_route_change = route_change
