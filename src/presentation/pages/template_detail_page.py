@@ -12,6 +12,7 @@ from infrastructure.image import ImageServer
 from presentation.components import (
     CommentsSection,
     VoteButton,
+    build_intro_markdown,
     build_social_links_section,
     build_user_row,
 )
@@ -156,11 +157,7 @@ class TemplateDetailPage:
                 self._create_social_links_section(template),
                 # Introduction (Markdown)
                 ft.Container(
-                    content=ft.Markdown(
-                        template.introduce,
-                        fit_content=False,
-                        on_tap_link=lambda e: open_url(self.page, e.data),
-                    ),
+                    content=build_intro_markdown(self.page, template.introduce),
                     padding=ft.padding.all(20),
                 ),
                 # Reviews (same data as the website's 使用者評論 tab)

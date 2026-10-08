@@ -1,5 +1,4 @@
 import flet as ft
-import re
 import asyncio
 import logging
 from typing import List, Optional
@@ -13,6 +12,7 @@ from presentation.components import (
     CommentsSection,
     VoteButton,
     build_avatar,
+    build_intro_markdown,
     build_partner_badge,
     build_social_links_section,
     build_user_row,
@@ -83,25 +83,6 @@ class BotDetailPage:
         image_id = self.image_server.register_image(url)
 
         return self.image_server.get_image_url(image_id)
-
-    def _convert_discord_emojis(self, text: str) -> str:
-        if not text:
-            return ""
-
-        # Replace animated emojis <a:name:id>
-        text = re.sub(
-            r"<a:\w*:(\d+)>",
-            r"![emoji](https://cdn.discordapp.com/emojis/\1.gif?size=32&quality=lossless)",
-            text,
-        )
-
-        # Replace static emojis <:name:id>
-        text = re.sub(
-            r"<:\w*:(\d+)>",
-            r"![emoji](https://cdn.discordapp.com/emojis/\1.png?size=32&quality=lossless)",
-            text,
-        )
-        return text
 
     def build(self) -> ft.Control:
         """Build page UI"""
@@ -205,10 +186,8 @@ class BotDetailPage:
                 self._create_social_links_section(bot),
                 # Introduction (Markdown)
                 ft.Container(
-                    content=ft.Markdown(
-                        self._convert_discord_emojis(bot.introduce),
-                        fit_content=False,
-                        on_tap_link=lambda e: open_url(self.page, e.data),
+                    content=build_intro_markdown(
+                        self.page, bot.introduce, convert_emojis=True
                     ),
                     padding=ft.padding.all(20),
                 ),
