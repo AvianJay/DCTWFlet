@@ -3,16 +3,18 @@ import re
 import asyncio
 import logging
 from typing import List, Optional
-from application.services import DiscoveryService
+from application.services import DiscoveryService, UserProfileService
 from domain.discovery.entities import Bot, BotAuthor
 from domain.shared import EntityNotFoundException
 from infrastructure.di import get_container
 from infrastructure.api import DctwApiClient
 from infrastructure.image import ImageServer
 from presentation.components import (
+    CommentsSection,
     VoteButton,
     build_avatar,
     build_social_links_section,
+    build_user_row,
 )
 from presentation.tag_mappings import BOT_TAGS
 from presentation.url_helper import open_url
@@ -23,13 +25,17 @@ logger = logging.getLogger(__name__)
 class BotDetailPage:
     """Bot detail page"""
 
-    def __init__(self, page: ft.Page, bot_id: str):
+    def __init__(self, page: ft.Page, bot_id: str, on_tag_click=None):
         self._content_container = None
         self.page = page
         self.bot_id = bot_id
+        self._on_tag_click = on_tag_click
         self.container = get_container()
         self.discovery_service: DiscoveryService = self.container.resolve(
             DiscoveryService
+        )
+        self.user_profile_service: UserProfileService = self.container.resolve(
+            UserProfileService
         )
         self.image_server: ImageServer = self.container.resolve(ImageServer)
         self.api_client: DctwApiClient = self.container.resolve(DctwApiClient)
@@ -37,6 +43,7 @@ class BotDetailPage:
         self._vote_count_text: Optional[ft.Text] = None
         self._badges_container: Optional[ft.Container] = None
         self._author_container: Optional[ft.Container] = None
+        self._comments_container: Optional[ft.Container] = None
 
     def _get_tag_info(self, tag_name: str) -> tuple[str, str]:
         """Get tag display name and icon"""
@@ -206,6 +213,8 @@ class BotDetailPage:
                 ),
                 # Statistics
                 self._create_statistics_section(bot),
+                # Reviews (same data as the website's 使用者評論 tab)
+                self._create_comments_section(bot),
                 # DCTW page link
                 ft.Row(
                     [
@@ -337,43 +346,25 @@ class BotDetailPage:
 
     def _create_authors_section(self, authors: List[BotAuthor]) -> ft.Control:
         """Create the author row (avatar(s) + name) of the official page."""
-        if not authors:
-            return ft.Container(height=0)
+        return build_user_row("作者", authors, self._cache_image)
 
-        avatars = [
-            build_avatar(
-                self._cache_image(author.avatar_url) if author.avatar_url else "",
-                radius=12,
-            )
-            for author in authors[:3]
-        ]
-        names = "、".join(author.name for author in authors if author.name)
-        if not names:
-            return ft.Container(height=0)
-
-        if len(names) > 24:
-            names = names[:23] + "\u2026"
-
-        row_controls = [ft.Text("作者", size=12, color=ft.Colors.OUTLINE)]
-        row_controls.extend(avatars)
-        row_controls.append(
-            ft.Text(
-                names,
-                size=13,
-                weight=ft.FontWeight.BOLD,
-                color=ft.Colors.OUTLINE,
-            )
+    def _create_comments_section(self, bot: Bot) -> ft.Control:
+        """Comments only arrive with the detail payload, so start loading."""
+        self._comments_container = ft.Container(
+            content=CommentsSection(
+                page=self.page,
+                comments=bot.comments,
+                load_profiles=self._load_reviewer_profiles,
+                cache_image=self._cache_image,
+                loading=not bot.comments,
+            ).build()
         )
+        return self._comments_container
 
-        return ft.Container(
-            content=ft.Row(
-                row_controls,
-                alignment=ft.MainAxisAlignment.CENTER,
-                vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                spacing=4,
-            ),
-            alignment=ft.Alignment(0, 0),
-            padding=ft.padding.symmetric(horizontal=20),
+    async def _load_reviewer_profiles(self, user_ids: List[str]) -> List[BotAuthor]:
+        """Resolve the reviewers through the official bot page action."""
+        return await self.user_profile_service.get_profiles(
+            user_ids, f"/bots/{self.bot_id}/"
         )
 
     async def _load_bot_details(self) -> None:
@@ -388,6 +379,7 @@ class BotDetailPage:
             )
         except Exception as error:
             logger.warning(f"Failed to load bot details for {bot.id}: {error}")
+            self._update_comments(bot.comments)
             return
 
         try:
@@ -403,9 +395,24 @@ class BotDetailPage:
                 self._badges_container.content = self._create_badges_section(
                     bot, is_partnered=True
                 )
+            self._update_comments(details.comments)
             self.page.update()
         except Exception:
             logger.debug("Bot detail page closed before the extra data arrived")
+
+    def _update_comments(self, comments) -> None:
+        """Swap the comment placeholder for the reviews of the website."""
+        if self._comments_container is None:
+            return
+        try:
+            self._comments_container.content = CommentsSection(
+                page=self.page,
+                comments=comments,
+                load_profiles=self._load_reviewer_profiles,
+                cache_image=self._cache_image,
+            ).build()
+        except Exception:
+            logger.debug("Bot detail page closed before the comments arrived")
 
     def _create_tags_section(self, bot: Bot) -> ft.Control:
         """Create tags section"""
@@ -415,7 +422,14 @@ class BotDetailPage:
         for tag in bot.tags:
             display_name, icon = self._get_tag_info(tag.name)
 
-            tag_buttons.append(ft.ElevatedButton(content=ft.Text(display_name), icon=icon))
+            tag_buttons.append(
+                ft.ElevatedButton(
+                    content=ft.Text(display_name),
+                    icon=icon,
+                    tooltip="顯示相關機器人",
+                    on_click=lambda e, name=tag.name: self._open_related(name),
+                )
+            )
 
         if not tag_buttons:
             return ft.Container(height=0)
@@ -430,6 +444,15 @@ class BotDetailPage:
             alignment=ft.Alignment(0, 0),
             padding=ft.padding.symmetric(horizontal=20),
         )
+
+    def _open_related(self, tag_name: str) -> None:
+        """Show the bot list filtered by the tag that was tapped."""
+        if self._on_tag_click is None:
+            return
+        try:
+            self._on_tag_click(tag_name)
+        except Exception:
+            logger.exception("Failed to open the related bots")
 
     def _create_action_buttons(self, bot: Bot) -> ft.Control:
         """Create action buttons (invite, support server, website)"""

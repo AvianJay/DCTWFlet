@@ -290,8 +290,26 @@ async def main(page: ft.Page):
             padding=0,
         )
 
+    def show_related_bot_tag(tag_name: str) -> None:
+        """Open the bot list filtered by the tag tapped on a bot page."""
+        bot_page.show_related_tag(tag_name)
+        select_tab(0)
+        navigate("/")
+
+    def show_related_server_tag(tag_name: str) -> None:
+        """Open the server list filtered by the tag tapped on a server page."""
+        server_page.show_related_tag(tag_name)
+        select_tab(1)
+        navigate("/")
+
+    def show_related_template_tag(tag_name: str) -> None:
+        """Open the template list filtered by the tag tapped on a template page."""
+        template_page.show_related_tag(tag_name)
+        select_tab(2)
+        navigate("/")
+
     def create_bot_detail_view(bot_id: str) -> ft.View:
-        detail_page = BotDetailPage(page, bot_id)
+        detail_page = BotDetailPage(page, bot_id, on_tag_click=show_related_bot_tag)
         return ft.View(
             route=f"/bot/{bot_id}",
             controls=[ft.Container(content=detail_page.build(), expand=True)],
@@ -308,7 +326,9 @@ async def main(page: ft.Page):
         )
 
     def create_server_detail_view(server_id: str) -> ft.View:
-        detail_page = ServerDetailPage(page, server_id)
+        detail_page = ServerDetailPage(
+            page, server_id, on_tag_click=show_related_server_tag
+        )
         return ft.View(
             route=f"/server/{server_id}",
             controls=[ft.Container(content=detail_page.build(), expand=True)],
@@ -325,7 +345,9 @@ async def main(page: ft.Page):
         )
 
     def create_template_detail_view(template_id: str) -> ft.View:
-        detail_page = TemplateDetailPage(page, template_id)
+        detail_page = TemplateDetailPage(
+            page, template_id, on_tag_click=show_related_template_tag
+        )
         return ft.View(
             route=f"/template/{template_id}",
             controls=[ft.Container(content=detail_page.build(), expand=True)],

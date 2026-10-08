@@ -219,7 +219,10 @@ class SettingsPage:
         """Update the API key status label"""
         if api_key and api_key.is_set:
             self.api_key_status.value = f"已設定 API Key：{api_key}"
-            self.api_key_status.color = ft.Colors.GREEN
+            # The configured key is informational, not a success banner: use
+            # the regular text color (white in the dark theme) like the user
+            # asked for, instead of the green one.
+            self.api_key_status.color = ft.Colors.ON_SURFACE
         else:
             self.api_key_status.value = "尚未設定 API Key（投票時需要）"
             self.api_key_status.color = ft.Colors.ORANGE

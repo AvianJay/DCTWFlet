@@ -152,6 +152,15 @@ class TemplateListPage:
         self._sync_filter_icon()
         self.page.run_task(self._load_templates)
 
+    def show_related_tag(self, tag_name: str) -> None:
+        """Show the templates of one tag (called when a detail page tag is tapped)."""
+        tag = (tag_name or "").strip().lower()
+        self._selected_tags = {tag} if tag in TEMPLATE_TAG_FILTERS else set()
+        if self.search_field.value:
+            self.search_field.value = ""
+        self._sync_filter_icon()
+        self.page.run_task(self._load_templates)
+
     def _sync_filter_icon(self) -> None:
         """Show the active tag count on the funnel icon."""
         count = len(self._selected_tags)

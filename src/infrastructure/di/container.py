@@ -20,7 +20,11 @@ from ..repositories import (
     JsonPreferencesRepository,
 )
 
-from application.services import DiscoveryService, PreferenceService
+from application.services import (
+    DiscoveryService,
+    PreferenceService,
+    UserProfileService,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -167,6 +171,15 @@ def setup_container() -> DiContainer:
     container.register(
         PreferenceService,
         lambda c: PreferenceService(preferences_repo=c.resolve(PreferencesRepository)),
+        singleton=True,
+    )
+
+    container.register(
+        UserProfileService,
+        lambda c: UserProfileService(
+            api_client=c.resolve(DctwApiClient),
+            cache_manager=c.resolve(CacheManager),
+        ),
         singleton=True,
     )
 

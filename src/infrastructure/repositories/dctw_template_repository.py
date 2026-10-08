@@ -15,9 +15,12 @@ from ..cache import CacheManager
 from .api_helpers import (
     is_listed_item,
     normalize_url,
+    parse_author_ids,
+    parse_comments,
     parse_datetime,
     parse_social_links,
     parse_tag_list,
+    serialize_comments,
     to_bool,
 )
 
@@ -90,6 +93,16 @@ class DctwTemplateRepository(TemplateRepository):
             data.get("shareLink") or data.get("url") or data.get("share_url")
         )
 
+        cached_author_ids = data.get("author_ids")
+        if isinstance(cached_author_ids, list):
+            author_ids = [
+                str(value).strip()
+                for value in cached_author_ids
+                if str(value).strip()
+            ]
+        else:
+            author_ids = parse_author_ids(data)
+
         return Template(
             id=int(data["id"]),
             name=data.get("name") or f"Template {data['id']}",
@@ -115,6 +128,8 @@ class DctwTemplateRepository(TemplateRepository):
             ),
             pinned=to_bool(data.get("pinned", False)),
             social_links=parse_social_links(data.get("socialLinks")),
+            author_ids=author_ids,
+            comments=parse_comments(data.get("comments")),
         )
 
     def _serialize_template(self, template: Template) -> dict:
@@ -128,9 +143,11 @@ class DctwTemplateRepository(TemplateRepository):
             "votes": template.statistics.votes,
             "tags": [tag.name for tag in template.tags],
             "share_url": template.links.share_url,
+            "author_ids": template.author_ids,
             "created_at": template.timestamps.created_at.isoformat(),
             "bumped_at": template.timestamps.bumped_at.isoformat(),
             "socialLinks": template.social_links,
+            "comments": serialize_comments(template.comments),
         }
 
     def _deserialize_template(self, data: dict) -> Template:

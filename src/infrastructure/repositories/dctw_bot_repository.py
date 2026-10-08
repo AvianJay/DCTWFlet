@@ -5,9 +5,15 @@ from typing import Dict, List, Optional
 import logging
 
 from domain.discovery.repositories import BotRepository
-from domain.discovery.entities import Bot, BotAuthor, BotDetails, BotLinks
+from domain.discovery.entities import (
+    Bot,
+    BotAuthor,
+    BotDetails,
+    BotLinks,
+)
 from domain.discovery.value_objects import (
     BotTag,
+    Comment,
     ContentStatus,
     Statistics,
     Timestamps,
@@ -23,9 +29,11 @@ from .api_helpers import (
     normalize_optional_url,
     normalize_url,
     parse_author_ids,
+    parse_comments,
     parse_datetime,
     parse_social_links,
     parse_tag_list,
+    serialize_comments,
     to_bool,
 )
 
@@ -86,17 +94,37 @@ class DctwBotRepository(BotRepository):
     async def find_details(
         self, bot_id: int, author_ids: Optional[List[str]] = None
     ) -> BotDetails:
-        """Authors and partner flag shown on the official bot page.
+        """Authors, partner flag and comments of the official bot page.
 
-        Both requests run in parallel so a detail page can refresh its
-        badges right after the (cached) bot data is on screen.
+        The requests run in parallel so a detail page can refresh its badges
+        and comments right after the (cached) bot data is on screen.
         """
-        is_partnered, authors = await asyncio.gather(
+        is_partnered, authors, comments = await asyncio.gather(
             self._load_partner_status(bot_id),
             self._load_authors(bot_id, list(author_ids or [])),
+            self._load_comments(bot_id),
         )
 
-        return BotDetails(is_partnered=is_partnered, authors=authors)
+        return BotDetails(
+            is_partnered=is_partnered, authors=authors, comments=comments
+        )
+
+    async def _load_comments(self, bot_id: int) -> List[Comment]:
+        """Read the reviews, which only the single bot endpoint returns."""
+        cache_key = f"bots:comments:{bot_id}"
+        cached = await self._cache.get(cache_key)
+        if isinstance(cached, list):
+            return parse_comments(cached)
+
+        try:
+            data = await self._api_client.get_bot(bot_id)
+        except Exception as error:
+            logger.warning(f"Failed to load the comments of bot {bot_id}: {error}")
+            return []
+
+        comments = parse_comments((data or {}).get("comments"))
+        await self._cache.set(cache_key, serialize_comments(comments), ttl=300)
+        return comments
 
     async def _load_partner_status(self, bot_id: int) -> bool:
         """Read the partner flag from the single bot endpoint."""
@@ -151,7 +179,9 @@ class DctwBotRepository(BotRepository):
                 missing.append(author_id)
 
         if missing:
-            for profile in await self._api_client.get_user_profiles(missing, bot_id):
+            for profile in await self._api_client.get_user_profiles(
+                missing, f"/bots/{bot_id}/"
+            ):
                 profile_id = str(profile.get("id") or "").strip()
                 if not profile_id:
                     continue
@@ -276,6 +306,7 @@ class DctwBotRepository(BotRepository):
             pinned=to_bool(data.get("pinned", False)),
             author_ids=author_ids,
             social_links=parse_social_links(data.get("socialLinks")),
+            comments=parse_comments(data.get("comments")),
         )
 
     def _serialize_bot(self, bot: Bot) -> dict:
@@ -299,6 +330,7 @@ class DctwBotRepository(BotRepository):
             "web_url": bot.links.website,
             "author_ids": bot.author_ids,
             "socialLinks": bot.social_links,
+            "comments": serialize_comments(bot.comments),
             "created_at": bot.timestamps.created_at.isoformat(),
             "bumped_at": bot.timestamps.bumped_at.isoformat(),
             "pinned": bot.pinned,

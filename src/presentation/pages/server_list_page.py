@@ -153,6 +153,15 @@ class ServerListPage:
         self._sync_filter_icon()
         self.page.run_task(self._load_servers)
 
+    def show_related_tag(self, tag_name: str) -> None:
+        """Show the servers of one tag (called when a detail page tag is tapped)."""
+        tag = (tag_name or "").strip().lower()
+        self._selected_tags = {tag} if tag in SERVER_TAG_FILTERS else set()
+        if self.search_field.value:
+            self.search_field.value = ""
+        self._sync_filter_icon()
+        self.page.run_task(self._load_servers)
+
     def _sync_filter_icon(self) -> None:
         """Show the active tag count on the funnel icon."""
         count = len(self._selected_tags)

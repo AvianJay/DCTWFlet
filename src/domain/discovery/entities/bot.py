@@ -6,6 +6,7 @@ from domain.shared import Entity
 from ..value_objects import (
     Tag,
     BotTag,
+    Comment,
     FilterCriteria,
     ContentStatus,
     Statistics,
@@ -14,6 +15,7 @@ from ..value_objects import (
     BannerUrl,
     InviteUrl,
 )
+from .user_profile import UserProfile
 
 
 @dataclass(frozen=True)
@@ -25,13 +27,9 @@ class BotLinks:
     website: Optional[str] = None
 
 
-@dataclass(frozen=True)
-class BotAuthor:
-    """Author/developer profile shown next to the bot on the official page."""
-
-    id: str
-    name: str
-    avatar_url: Optional[str] = None
+# Authors are plain Discord user profiles, shared with the server admins
+# and the reviewers shown in the comments section.
+BotAuthor = UserProfile
 
 
 @dataclass(frozen=True)
@@ -40,6 +38,7 @@ class BotDetails:
 
     is_partnered: bool = False
     authors: List[BotAuthor] = field(default_factory=list)
+    comments: List[Comment] = field(default_factory=list)
 
 
 class Bot(Entity[int]):
@@ -64,6 +63,7 @@ class Bot(Entity[int]):
         pinned: bool = False,
         author_ids: Optional[List[str]] = None,
         social_links: Optional[Dict[str, str]] = None,
+        comments: Optional[List[Comment]] = None,
     ):
         super().__init__(id)
         self._validate_name(name)
@@ -83,6 +83,7 @@ class Bot(Entity[int]):
         self._pinned = pinned
         self._author_ids = list(author_ids or [])
         self._social_links = dict(social_links or {})
+        self._comments = list(comments or [])
 
     @property
     def name(self) -> str:
@@ -99,6 +100,10 @@ class Bot(Entity[int]):
     @property
     def social_links(self) -> Dict[str, str]:
         return dict(self._social_links)
+
+    @property
+    def comments(self) -> List[Comment]:
+        return self._comments.copy()
 
     @property
     def avatar(self) -> AvatarUrl:

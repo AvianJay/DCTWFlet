@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from typing import List, Optional
-from ..entities import Server
+from ..entities import Server, ServerDetails
 
 
 class ServerRepository(ABC):
@@ -16,6 +16,11 @@ class ServerRepository(ABC):
     @abstractmethod
     async def find_by_id(self, server_id: int) -> Optional[Server]:
         """Find Server by ID"""
+        pass
+
+    @abstractmethod
+    async def find_details(self, server_id: int) -> ServerDetails:
+        """Get the admin/comment details shown on the official server page"""
         pass
 
     @abstractmethod

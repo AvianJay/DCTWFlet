@@ -8,7 +8,13 @@ from domain.discovery.repositories import (
     ServerRepository,
     TemplateRepository,
 )
-from domain.discovery.entities import Bot, BotDetails, Server, Template
+from domain.discovery.entities import (
+    Bot,
+    BotDetails,
+    Server,
+    ServerDetails,
+    Template,
+)
 from domain.discovery.value_objects import FilterCriteria, SortOption
 from domain.discovery.aggregates import (
     BotCollection,
@@ -128,6 +134,10 @@ class DiscoveryService:
             raise EntityNotFoundException("Server", server_id)
 
         return server
+
+    async def get_server_details(self, server_id: int) -> ServerDetails:
+        """Admins and comments shown on the official server page."""
+        return await self._server_repo.find_details(server_id)
 
     async def list_templates(
         self,

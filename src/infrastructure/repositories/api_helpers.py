@@ -1,13 +1,13 @@
 """Helpers for the data returned by the DCTW API."""
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Optional
 
-from ..config.constants import DCTW_API_BASE_URL, DEFAULT_AVATAR_URL
+from domain.discovery.value_objects import Comment
+from domain.discovery.value_objects.comment import DCTW_TIMEZONE
 
-# DCTW stores timestamps without a timezone offset in UTC+8 (Taipei).
-DCTW_TIMEZONE = timezone(timedelta(hours=8))
+from ..config.constants import DCTW_API_BASE_URL, DEFAULT_AVATAR_URL
 
 # Avatar used when the API does not provide a usable image.
 FALLBACK_AVATAR_URL = DEFAULT_AVATAR_URL
@@ -95,6 +95,16 @@ def parse_author_ids(data: dict) -> list[str]:
     The API stores them as a single id, a comma separated list or a JSON
     array string; the website merges ``author`` with ``devs``/``co_authors``.
     """
+    ids = parse_id_list(data.get("author"))
+    for value in (data.get("devs"), data.get("co_authors")):
+        for user_id in parse_id_list(value):
+            if user_id not in ids:
+                ids.append(user_id)
+    return ids
+
+
+def parse_id_list(value) -> list[str]:
+    """Return Discord ids from the single/CSV/JSON-array shapes of the API."""
     ids: list[str] = []
 
     def add(value) -> None:
@@ -125,9 +135,127 @@ def parse_author_ids(data: dict) -> list[str]:
             if part and part not in ids:
                 ids.append(part)
 
-    add(data.get("author"))
-    add(data.get("devs") or data.get("co_authors"))
+    add(value)
     return ids
+
+
+def parse_features(value) -> list[str]:
+    """Return the raw Discord guild features of a server.
+
+    The API stores them as a comma separated string (``COMMUNITY,ANIMATED_ICON``)
+    and the website only uses them to label the server (discoverable,
+    community or private).
+    """
+    if not value:
+        return []
+
+    if isinstance(value, str):
+        raw_values = value.split(",")
+    elif isinstance(value, (list, tuple, set)):
+        raw_values = [str(item) for item in value]
+    else:
+        return []
+
+    features: list[str] = []
+    for raw_value in raw_values:
+        feature = raw_value.strip().upper()
+        if feature and feature not in features:
+            features.append(feature)
+    return features
+
+
+def parse_admin_entries(value) -> list[dict[str, str]]:
+    """Return the admins of a server as ``{"id": ..., "job": ...}`` entries.
+
+    The API stores admins as a JSON string (or array) of objects like
+    ``{"id": "123", "job": "管理員"}``. Just like the website, entries
+    without an id are dropped.
+    """
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return []
+        try:
+            value = json.loads(text)
+        except ValueError:
+            return []
+
+    if not isinstance(value, list):
+        return []
+
+    entries: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for item in value:
+        if isinstance(item, str):
+            user_id, job = item.strip(), ""
+        elif isinstance(item, dict):
+            user_id = str(item.get("id") or "").strip()
+            job = str(item.get("job") or item.get("role") or "").strip()
+        else:
+            continue
+
+        if not user_id or user_id in seen:
+            continue
+        seen.add(user_id)
+        entries.append({"id": user_id, "job": job})
+    return entries
+
+
+def parse_comments(value) -> list[Comment]:
+    """Return the reviews of an API item as :class:`Comment` objects.
+
+    Reviews are embedded in the item itself (``comments``); the separate
+    ``/comments/`` endpoints answer 404, so the single item endpoint is the
+    source of truth used by the website as well.
+    """
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return []
+        try:
+            value = json.loads(text)
+        except ValueError:
+            return []
+
+    if not isinstance(value, list):
+        return []
+
+    comments: list[Comment] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+
+        try:
+            stars = int(item.get("stars") or 0)
+        except (TypeError, ValueError):
+            stars = 0
+
+        comments.append(
+            Comment(
+                user_id=str(
+                    item.get("userId") or item.get("user_id") or ""
+                ).strip(),
+                stars=max(0, min(5, stars)),
+                content=str(item.get("content") or "").strip(),
+                created_at=parse_datetime(item.get("created_at")),
+                edited=to_bool(item.get("edited", False)),
+            )
+        )
+    return comments
+
+
+def serialize_comments(comments) -> list[dict]:
+    """Serialize comments for the cache (round-trips through parse_comments)."""
+    return [
+        {
+            "userId": comment.user_id,
+            "stars": comment.stars,
+            "content": comment.content,
+            "created_at": comment.created_at.isoformat(),
+            "edited": comment.edited,
+        }
+        for comment in comments
+    ]
 
 
 # Platforms shown on the official detail pages, in the same order.

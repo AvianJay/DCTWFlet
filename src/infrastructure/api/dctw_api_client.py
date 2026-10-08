@@ -53,6 +53,38 @@ class DctwApiClient:
     GET_BOT_ACTION = "601cebfbdd90674fa83db025737892d230455e1ffb"
     BOT_DETAIL_FIELDS = ["id", "partner", "slash", "author", "devs"]
 
+    # Server action used by the official website to read a single server
+    # record (the public API does not expose the admin list and only the
+    # single item endpoint carries the comments).
+    GET_SERVER_ACTION = "604ca02ba1d5f34050d7766e8df0c30010306e7b38"
+    SERVER_DETAIL_FIELDS = [
+        "id",
+        "avatar",
+        "banner",
+        "name",
+        "description",
+        "introduce",
+        "members",
+        "features",
+        "tags",
+        "vote_count",
+        "inviteLink",
+        "badge",
+        "analytic",
+        "viewsAnalytic",
+        "gameExtension",
+        "partner",
+        "emojis",
+        "stickers",
+        "events",
+        "admins",
+        "screenshots",
+        "author",
+        "socialLinks",
+        "comments",
+        "onlineMembers",
+    ]
+
     def __init__(
         self,
         api_key: Optional[str] = None,
@@ -100,19 +132,23 @@ class DctwApiClient:
         return await self._get_item(f"/bots/{bot_id}/")
 
     async def get_user_profiles(
-        self, user_ids: List[str], page_bot_id: Optional[int] = None
+        self, user_ids: List[str], page_path: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Resolve Discord user ids to their public profile.
 
         The public API only exposes author ids, so the names and avatars are
         read from the same server action the official website uses. Failures
         are swallowed: a bot page stays usable without the author block.
+        ``page_path`` is the detail page the action is called from (the
+        website requires a matching Referer, e.g. ``/bots/123/``).
         """
         ids = [str(user_id).strip() for user_id in user_ids if str(user_id).strip()]
         if not ids:
             return []
 
-        endpoint = f"/bots/{page_bot_id}" if page_bot_id else "/bots"
+        endpoint = (page_path or "/bots").strip()
+        if not endpoint.startswith("/"):
+            endpoint = f"/{endpoint}"
         headers = {
             "Next-Action": self.GET_USERS_ACTION,
             "Content-Type": "text/plain;charset=UTF-8",
@@ -178,6 +214,38 @@ class DctwApiClient:
     async def get_server(self, server_id: int) -> Optional[Dict[str, Any]]:
         """Get a single server by ID. Returns None when the API answers 404."""
         return await self._get_item(f"/servers/{server_id}/")
+
+    async def get_server_details(self, server_id: int) -> Optional[Dict[str, Any]]:
+        """Read one server record from the official website detail page.
+
+        Used for the fields the public API does not return (the admin list
+        and the comments, which only the single item endpoint carries).
+        """
+        endpoint = f"/servers/{server_id}/"
+        headers = {
+            "Next-Action": self.GET_SERVER_ACTION,
+            "Content-Type": "text/plain;charset=UTF-8",
+            "Accept": "text/x-component",
+            "Origin": self._base_url,
+            "Referer": f"{self._base_url}{endpoint}",
+        }
+
+        try:
+            async with AsyncHttpClient(
+                self._base_url, headers={"User-Agent": self._user_agent}
+            ) as client:
+                payload = await client.post_text(
+                    endpoint,
+                    json.dumps([str(server_id), list(self.SERVER_DETAIL_FIELDS)]),
+                    headers=headers,
+                )
+        except Exception as error:
+            logger.warning(f"Failed to load server details for {server_id}: {error}")
+            return None
+
+        data = self._extract_action_payload(payload)
+        item = data.get("item") if isinstance(data, dict) else None
+        return item if isinstance(item, dict) else None
 
     async def get_templates(self) -> List[Dict[str, Any]]:
         """Get all templates."""
@@ -465,7 +533,11 @@ class DctwApiClient:
         decoder = json.JSONDecoder()
         results = []
 
-        for match in re.finditer(r"(?:^|\s)(\d+):", payload or ""):
+        # The flight stream marks each row as ``<id>:``. The rows are usually
+        # separated by whitespace, but a text row can sit right in front of
+        # the JSON row with no separator at all, so any marker that is not
+        # part of a number is considered.
+        for match in re.finditer(r"(?<![\d$])(\d+):", payload or ""):
             try:
                 value, _ = decoder.raw_decode(payload, match.end())
             except ValueError:
@@ -474,6 +546,13 @@ class DctwApiClient:
 
         if not results:
             return None
+
+        # The website wraps its answers as {"ok": ..., "item": {...}}, which
+        # is preferred so a JSON looking string inside the payload can never
+        # shadow the real answer.
+        for _, value in reversed(results):
+            if isinstance(value, dict) and "item" in value:
+                return value
 
         lists = [value for _, value in results if isinstance(value, list)]
         if lists:

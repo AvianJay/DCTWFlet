@@ -6,6 +6,7 @@ from domain.shared import Entity
 from ..value_objects import (
     Tag,
     TemplateTag,
+    Comment,
     FilterCriteria,
     Statistics,
     Timestamps,
@@ -35,6 +36,8 @@ class Template(Entity[int]):
         timestamps: Timestamps,
         pinned: bool = False,
         social_links: Optional[Dict[str, str]] = None,
+        author_ids: Optional[List[str]] = None,
+        comments: Optional[List[Comment]] = None,
     ):
         super().__init__(id)
         self._validate_name(name)
@@ -49,6 +52,8 @@ class Template(Entity[int]):
         self._timestamps = timestamps
         self._pinned = pinned
         self._social_links = dict(social_links or {})
+        self._author_ids = list(author_ids or [])
+        self._comments = list(comments or [])
 
     @property
     def name(self) -> str:
@@ -85,6 +90,14 @@ class Template(Entity[int]):
     @property
     def social_links(self) -> Dict[str, str]:
         return dict(self._social_links)
+
+    @property
+    def author_ids(self) -> List[str]:
+        return self._author_ids.copy()
+
+    @property
+    def comments(self) -> List[Comment]:
+        return self._comments.copy()
 
     @property
     def timestamps(self) -> Timestamps:

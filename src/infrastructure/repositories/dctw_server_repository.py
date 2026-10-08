@@ -4,7 +4,12 @@ from typing import List, Optional
 import logging
 
 from domain.discovery.repositories import ServerRepository
-from domain.discovery.entities import Server, ServerLinks
+from domain.discovery.entities import (
+    Server,
+    ServerAdmin,
+    ServerDetails,
+    ServerLinks,
+)
 from domain.discovery.value_objects import (
     ServerTag,
     Statistics,
@@ -20,9 +25,13 @@ from .api_helpers import (
     is_listed_item,
     normalize_optional_url,
     normalize_url,
+    parse_admin_entries,
+    parse_comments,
     parse_datetime,
+    parse_features,
     parse_social_links,
     parse_tag_list,
+    serialize_comments,
     to_bool,
 )
 
@@ -33,6 +42,7 @@ class DctwServerRepository(ServerRepository):
     """DCTW API-based Server repository implementation"""
 
     CACHE_KEY = "servers:all"
+    DETAIL_CACHE_PREFIX = "servers:details:"
 
     def __init__(self, api_client: DctwApiClient, cache_manager: CacheManager):
         self._api_client = api_client
@@ -81,6 +91,47 @@ class DctwServerRepository(ServerRepository):
         """Clear cache"""
         await self._cache.delete(self.CACHE_KEY)
         logger.info("Server cache cleared")
+
+    async def find_details(self, server_id: int) -> ServerDetails:
+        """Admins and comments of the official server page.
+
+        Both live outside the public list payload: the website reads them
+        through its own detail action, with the single item endpoint as a
+        fallback for the comments.
+        """
+        cache_key = f"{self.DETAIL_CACHE_PREFIX}{server_id}"
+        cached = await self._cache.get(cache_key)
+        if isinstance(cached, dict):
+            data = cached
+        else:
+            data = None
+            try:
+                data = await self._api_client.get_server_details(server_id)
+            except Exception as error:
+                logger.warning(
+                    f"Failed to load the detail data of server {server_id}: {error}"
+                )
+
+            if data is None:
+                try:
+                    data = await self._api_client.get_server(server_id)
+                except Exception as error:
+                    logger.warning(
+                        f"Failed to load the detail data of server {server_id}: {error}"
+                    )
+
+            if isinstance(data, dict):
+                await self._cache.set(cache_key, data, ttl=300)
+            else:
+                data = {}
+
+        return ServerDetails(
+            admins=[
+                ServerAdmin(id=entry["id"], job=entry["job"])
+                for entry in parse_admin_entries(data.get("admins"))
+            ],
+            comments=parse_comments(data.get("comments")),
+        )
 
     def _map_to_domain(self, data: dict) -> Server:
         """Map API data to domain model"""
@@ -142,6 +193,15 @@ class DctwServerRepository(ServerRepository):
             banner=BannerUrl(banner_url) if banner_url else None,
             pinned=to_bool(data.get("pinned", False)),
             social_links=parse_social_links(data.get("socialLinks")),
+            online_members=int(
+                data.get("onlineMembers", data.get("online_members", 0)) or 0
+            ),
+            features=parse_features(data.get("features")),
+            admins=[
+                ServerAdmin(id=entry["id"], job=entry["job"])
+                for entry in parse_admin_entries(data.get("admins"))
+            ],
+            comments=parse_comments(data.get("comments")),
         )
 
     @staticmethod
@@ -173,6 +233,12 @@ class DctwServerRepository(ServerRepository):
             "bumped_at": server.timestamps.bumped_at.isoformat(),
             "pinned": server.pinned,
             "socialLinks": server.social_links,
+            "online_members": server.online_members,
+            "features": server.features,
+            "admins": [
+                {"id": admin.id, "job": admin.job} for admin in server.admins
+            ],
+            "comments": serialize_comments(server.comments),
         }
 
     def _deserialize_server(self, data: dict) -> Server:
