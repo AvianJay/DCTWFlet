@@ -7,6 +7,7 @@ from .content_status import ContentStatus
 from .statistics import Statistics
 from .timestamps import Timestamps
 from .urls import AvatarUrl, BannerUrl, InviteUrl
+from .comment import Comment
 
 __all__ = [
     "Tag",
@@ -21,4 +22,5 @@ __all__ = [
     "AvatarUrl",
     "BannerUrl",
     "InviteUrl",
+    "Comment",
 ]

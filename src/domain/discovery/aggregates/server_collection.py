@@ -50,14 +50,12 @@ class ServerCollection(AggregateRoot):
         return [server for server in self._servers if server.matches_filter(criteria)]
 
     def sort_by(self, servers: List[Server], option: SortOption) -> List[Server]:
-        """Sort"""
-        if option == SortOption.NEWEST:
-            sorted_list = sorted(servers, key=lambda s: s.timestamps.created_at, reverse=True)
-        elif option == SortOption.VOTES:
+        """Sort - the same rules the DCTW website uses."""
+        if option == SortOption.MOST_VOTES:
             sorted_list = sorted(servers, key=lambda s: s.statistics.votes, reverse=True)
-        elif option == SortOption.MEMBERS:
+        elif option == SortOption.MOST_MEMBERS:
             sorted_list = sorted(servers, key=lambda s: s.statistics.members, reverse=True)
-        elif option == SortOption.BUMPED:
+        elif option in (SortOption.MOST_ACTIVE, SortOption.DEFAULT):
             sorted_list = sorted(servers, key=lambda s: s.timestamps.bumped_at, reverse=True)
         else:
             sorted_list = servers

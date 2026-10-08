@@ -1,11 +1,12 @@
 """Server entity"""
 
-from typing import List, Optional
-from dataclasses import dataclass
+from typing import Dict, List, Optional
+from dataclasses import dataclass, field
 from domain.shared import Entity
 from ..value_objects import (
     Tag,
     ServerTag,
+    Comment,
     FilterCriteria,
     Statistics,
     Timestamps,
@@ -20,6 +21,22 @@ class ServerLinks:
     """Server links collection"""
 
     invite: InviteUrl
+
+
+@dataclass(frozen=True)
+class ServerAdmin:
+    """An administrator listed on the official server page."""
+
+    id: str
+    job: str = ""
+
+
+@dataclass(frozen=True)
+class ServerDetails:
+    """Server information that is only available on the official detail page."""
+
+    admins: List[ServerAdmin] = field(default_factory=list)
+    comments: List[Comment] = field(default_factory=list)
 
 
 class Server(Entity[int]):
@@ -40,6 +57,11 @@ class Server(Entity[int]):
         timestamps: Timestamps,
         banner: Optional[BannerUrl] = None,
         pinned: bool = False,
+        social_links: Optional[Dict[str, str]] = None,
+        online_members: int = 0,
+        features: Optional[List[str]] = None,
+        admins: Optional[List[ServerAdmin]] = None,
+        comments: Optional[List[Comment]] = None,
     ):
         super().__init__(id)
         self._validate_name(name)
@@ -56,6 +78,11 @@ class Server(Entity[int]):
         self._links = links
         self._timestamps = timestamps
         self._pinned = pinned
+        self._social_links = dict(social_links or {})
+        self._online_members = max(0, int(online_members or 0))
+        self._features = list(features or [])
+        self._admins = list(admins or [])
+        self._comments = list(comments or [])
 
     @property
     def name(self) -> str:
@@ -100,6 +127,28 @@ class Server(Entity[int]):
     @property
     def links(self) -> ServerLinks:
         return self._links
+
+    @property
+    def social_links(self) -> Dict[str, str]:
+        return dict(self._social_links)
+
+    @property
+    def online_members(self) -> int:
+        """Members that are online right now (0 when Discord hides it)."""
+        return self._online_members
+
+    @property
+    def features(self) -> List[str]:
+        """Raw Discord guild features, e.g. ``COMMUNITY``."""
+        return self._features.copy()
+
+    @property
+    def admins(self) -> List[ServerAdmin]:
+        return self._admins.copy()
+
+    @property
+    def comments(self) -> List[Comment]:
+        return self._comments.copy()
 
     @property
     def timestamps(self) -> Timestamps:

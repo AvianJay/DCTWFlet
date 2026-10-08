@@ -1,28 +1,54 @@
 import flet as ft
-import re
 import asyncio
-from typing import Optional
-from application.services import DiscoveryService
-from domain.discovery.entities import Bot
+import logging
+from typing import List, Optional
+from application.services import (
+    DiscoveryService,
+    UserProfileService,
+)
+from domain.discovery.entities import Bot, BotAuthor
 from domain.shared import EntityNotFoundException
 from infrastructure.di import get_container
+from infrastructure.api import DctwApiClient
 from infrastructure.image import ImageServer
+from presentation.components import (
+    CommentsSection,
+    VoteButton,
+    build_avatar,
+    build_intro_markdown,
+    build_partner_badge,
+    build_social_links_section,
+    build_user_row,
+)
 from presentation.tag_mappings import BOT_TAGS
+from presentation.url_helper import open_url
+
+logger = logging.getLogger(__name__)
 
 
 class BotDetailPage:
     """Bot detail page"""
 
-    def __init__(self, page: ft.Page, bot_id: str):
+    def __init__(self, page: ft.Page, bot_id: str, on_tag_click=None):
         self._content_container = None
         self.page = page
         self.bot_id = bot_id
+        self._on_tag_click = on_tag_click
         self.container = get_container()
         self.discovery_service: DiscoveryService = self.container.resolve(
             DiscoveryService
         )
+        self.user_profile_service: UserProfileService = self.container.resolve(
+            UserProfileService
+        )
         self.image_server: ImageServer = self.container.resolve(ImageServer)
+        self.api_client: DctwApiClient = self.container.resolve(DctwApiClient)
         self._bot: Optional[Bot] = None
+        self._vote_count_text: Optional[ft.Text] = None
+        self._badges_container: Optional[ft.Container] = None
+        self._author_container: Optional[ft.Container] = None
+        self._comments_container: Optional[ft.Container] = None
+        self._comments_section: Optional[CommentsSection] = None
 
     def _get_tag_info(self, tag_name: str) -> tuple[str, str]:
         """Get tag display name and icon"""
@@ -62,25 +88,6 @@ class BotDetailPage:
 
         return self.image_server.get_image_url(image_id)
 
-    def _convert_discord_emojis(self, text: str) -> str:
-        if not text:
-            return ""
-
-        # Replace animated emojis <a:name:id>
-        text = re.sub(
-            r"<a:\w*:(\d+)>",
-            r"![emoji](https://cdn.discordapp.com/emojis/\1.gif?size=32&quality=lossless)",
-            text,
-        )
-
-        # Replace static emojis <:name:id>
-        text = re.sub(
-            r"<:\w*:(\d+)>",
-            r"![emoji](https://cdn.discordapp.com/emojis/\1.png?size=32&quality=lossless)",
-            text,
-        )
-        return text
-
     def build(self) -> ft.Control:
         """Build page UI"""
 
@@ -112,6 +119,7 @@ class BotDetailPage:
             bot_id_int = int(self.bot_id)
             self._bot = await self.discovery_service.get_bot_by_id(bot_id_int)
             self._render_bot_detail()
+            self.page.run_task(self._load_bot_details)
 
         except EntityNotFoundException as e:
             self._show_error(f"找不到此機器人 (ID: {self.bot_id})")
@@ -130,12 +138,23 @@ class BotDetailPage:
 
         bot = self._bot
 
+        # The author block and the partner badge come from the official
+        # detail page, so they are refreshed once that data arrives.
+        self._badges_container = ft.Container(
+            content=self._create_badges_section(bot),
+            alignment=ft.Alignment(0, 0),
+        )
+        self._author_container = ft.Container()
+
         # Create detail view
 
         detail_view = ft.Column(
             [
                 # Banner and Avatar
                 self._create_header_section(bot),
+                # Authors (avatars + name), right under the avatar like the
+                # official page
+                self._author_container,
                 # Name
                 ft.Row(
                     [
@@ -150,7 +169,7 @@ class BotDetailPage:
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 ),
                 # Badges (Verified, Partner)
-                self._create_badges_section(bot),
+                self._badges_container,
                 # Description
                 ft.Container(
                     content=ft.Text(
@@ -167,25 +186,27 @@ class BotDetailPage:
                 self._create_tags_section(bot),
                 # Action buttons (Invite, Support Server, Website)
                 self._create_action_buttons(bot),
+                # Social links (same platforms as the official page)
+                self._create_social_links_section(bot),
                 # Introduction (Markdown)
                 ft.Container(
-                    content=ft.Markdown(
-                        self._convert_discord_emojis(bot.introduce),
-                        fit_content=False,
-                        on_tap_link=lambda e: self.page.launch_url(e.data),
+                    content=build_intro_markdown(
+                        self.page, bot.introduce, convert_emojis=True
                     ),
                     padding=ft.padding.all(20),
                 ),
                 # Statistics
                 self._create_statistics_section(bot),
+                # Reviews (same data as the website's 使用者評論 tab)
+                self._create_comments_section(bot),
                 # DCTW page link
                 ft.Row(
                     [
                         ft.ElevatedButton(
                             content=ft.Text("DCTW 機器人頁面"),
                             icon=ft.Icons.OPEN_IN_NEW,
-                            on_click=lambda e: self.page.launch_url(
-                                f"https://dctw.xyz/bots/{bot.id}"
+                            on_click=lambda e: open_url(
+                                self.page, f"https://dctw.xyz/bots/{bot.id}"
                             ),
                         ),
                     ],
@@ -234,10 +255,7 @@ class BotDetailPage:
                 ft.Container(
                     content=ft.Stack(
                         [
-                            ft.CircleAvatar(
-                                foreground_image_src=avatar_url,
-                                radius=64,
-                            ),
+                            build_avatar(avatar_url, radius=64),
                             ft.Container(
                                 content=ft.Container(
                                     content=ft.CircleAvatar(
@@ -265,10 +283,13 @@ class BotDetailPage:
             height=256 + 64,
         )
 
-    def _create_badges_section(self, bot: Bot) -> ft.Control:
+    def _create_badges_section(
+        self, bot: Bot, is_partnered: Optional[bool] = None
+    ) -> ft.Control:
         """Create badges section (verified, partner)"""
 
         badges = []
+        partnered = bot.is_partnered if is_partnered is None else is_partnered
 
         if bot.verified:
             badges.append(
@@ -284,19 +305,8 @@ class BotDetailPage:
                 )
             )
 
-        if bot.is_partnered:
-            badges.append(
-                ft.ElevatedButton(
-                    content="DCTW 合作夥伴",
-                    color=ft.Colors.WHITE,
-                    icon=ft.Icons.STAR,
-                    icon_color=ft.Colors.WHITE,
-                    bgcolor=ft.Colors.GREEN,
-                    on_click=lambda e: self.page.open(
-                        ft.SnackBar(content=ft.Text("此機器人為 DCTW 合作夥伴。"))
-                    ),
-                )
-            )
+        if partnered:
+            badges.append(build_partner_badge("此機器人為 DCTW 合作夥伴。"))
 
         if not badges:
             return ft.Container(height=0)
@@ -307,6 +317,70 @@ class BotDetailPage:
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
         )
 
+    def _create_authors_section(self, authors: List[BotAuthor]) -> ft.Control:
+        """Create the author row (avatar(s) + name) of the official page."""
+        return build_user_row("作者", authors, self._cache_image)
+
+    def _create_comments_section(self, bot: Bot) -> ft.Control:
+        """Review list, like the official page shows it."""
+        self._comments_section = CommentsSection(
+            page=self.page,
+            comments=bot.comments,
+            load_profiles=self._load_reviewer_profiles,
+            cache_image=self._cache_image,
+            loading=not bot.comments,
+        )
+        self._comments_container = ft.Container(content=self._comments_section.build())
+        return self._comments_container
+
+    async def _load_reviewer_profiles(self, user_ids: List[str]) -> List[BotAuthor]:
+        """Resolve the reviewers through the official bot page action."""
+        return await self.user_profile_service.get_profiles(
+            user_ids, f"/bots/{self.bot_id}/"
+        )
+
+    async def _load_bot_details(self) -> None:
+        """Refresh the badge row and show the author row of the website."""
+        bot = self._bot
+        if bot is None:
+            return
+
+        try:
+            details = await self.discovery_service.get_bot_details(
+                bot.id, bot.author_ids
+            )
+        except Exception as error:
+            logger.warning(f"Failed to load bot details for {bot.id}: {error}")
+            self._update_comments(bot.comments)
+            return
+
+        try:
+            if details.authors and self._author_container is not None:
+                self._author_container.content = self._create_authors_section(
+                    details.authors
+                )
+            if (
+                details.is_partnered
+                and not bot.is_partnered
+                and self._badges_container is not None
+            ):
+                self._badges_container.content = self._create_badges_section(
+                    bot, is_partnered=True
+                )
+            self._update_comments(details.comments)
+            self.page.update()
+        except Exception:
+            logger.debug("Bot detail page closed before the extra data arrived")
+
+    def _update_comments(self, comments) -> None:
+        """Swap the comment placeholder for the reviews of the website."""
+        if self._comments_section is None:
+            return
+        try:
+            self._comments_section.set_comments(comments)
+        except Exception:
+            logger.debug("Bot detail page closed before the comments arrived")
+
     def _create_tags_section(self, bot: Bot) -> ft.Control:
         """Create tags section"""
 
@@ -315,7 +389,14 @@ class BotDetailPage:
         for tag in bot.tags:
             display_name, icon = self._get_tag_info(tag.name)
 
-            tag_buttons.append(ft.ElevatedButton(content=ft.Text(display_name), icon=icon))
+            tag_buttons.append(
+                ft.ElevatedButton(
+                    content=ft.Text(display_name),
+                    icon=icon,
+                    tooltip="顯示相關機器人",
+                    on_click=lambda e, name=tag.name: self._open_related(name),
+                )
+            )
 
         if not tag_buttons:
             return ft.Container(height=0)
@@ -331,13 +412,22 @@ class BotDetailPage:
             padding=ft.padding.symmetric(horizontal=20),
         )
 
+    def _open_related(self, tag_name: str) -> None:
+        """Show the bot list filtered by the tag that was tapped."""
+        if self._on_tag_click is None:
+            return
+        try:
+            self._on_tag_click(tag_name)
+        except Exception:
+            logger.exception("Failed to open the related bots")
+
     def _create_action_buttons(self, bot: Bot) -> ft.Control:
         """Create action buttons (invite, support server, website)"""
         buttons = [
             ft.ElevatedButton(
                 icon=ft.Icons.PERSON_ADD,
                 content=ft.Text("邀請機器人"),
-                on_click=lambda e: self.page.launch_url(bot.links.invite.value),
+                on_click=lambda e: open_url(self.page, bot.links.invite.value),
             ),
         ]
 
@@ -346,7 +436,7 @@ class BotDetailPage:
                 ft.ElevatedButton(
                     icon=ft.Icons.HELP_CENTER,
                     content=ft.Text("支援伺服器"),
-                    on_click=lambda e: self.page.launch_url(bot.links.support_server),
+                    on_click=lambda e: open_url(self.page, bot.links.support_server),
                 )
             )
 
@@ -355,7 +445,7 @@ class BotDetailPage:
                 ft.ElevatedButton(
                     icon=ft.Icons.LINK,
                     content=ft.Text("官方網站"),
-                    on_click=lambda e: self.page.launch_url(bot.links.website),
+                    on_click=lambda e: open_url(self.page, bot.links.website),
                 )
             )
 
@@ -369,21 +459,37 @@ class BotDetailPage:
             padding=ft.padding.symmetric(horizontal=20),
         )
 
+    def _create_social_links_section(self, bot: Bot) -> ft.Control:
+        """Create the social links block shown on the official page."""
+        section = build_social_links_section(
+            self.page, bot.social_links, self._cache_image
+        )
+        return section if section is not None else ft.Container(height=0)
+
     def _create_statistics_section(self, bot: Bot) -> ft.Control:
         """Create statistics section"""
+
+        self._vote_count_text = ft.Text(
+            str(bot.statistics.votes),
+            size=20,
+            weight=ft.FontWeight.BOLD,
+        )
 
         return ft.Container(
             content=ft.Row(
                 [
                     ft.Column(
                         [
-                            ft.Icon(ft.Icons.STAR, size=32),
-                            ft.Text(
-                                str(bot.statistics.votes),
-                                size=20,
-                                weight=ft.FontWeight.BOLD,
-                            ),
+                            ft.Icon(ft.Icons.HOW_TO_VOTE, size=32),
+                            self._vote_count_text,
                             ft.Text("投票數", size=14, color=ft.Colors.GREY),
+                            VoteButton(
+                                page=self.page,
+                                api_client=self.api_client,
+                                item_type="bots",
+                                item_id=bot.id,
+                                on_success=self._increment_vote_count,
+                            ),
                         ],
                         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
@@ -406,6 +512,22 @@ class BotDetailPage:
             padding=ft.padding.all(20),
         )
 
+    def _increment_vote_count(self) -> None:
+        """Increase the displayed vote count after a successful vote."""
+        if self._vote_count_text is None:
+            return
+
+        try:
+            current = int(str(self._vote_count_text.value))
+        except (TypeError, ValueError):
+            return
+
+        self._vote_count_text.value = str(current + 1)
+        try:
+            self.page.update()
+        except Exception:
+            logger.debug("Page closed before the vote count could be refreshed")
+
     def _show_error(self, message: str):
         """Show error message"""
 
@@ -417,7 +539,7 @@ class BotDetailPage:
                     ft.ElevatedButton(
                         content="返回",
                         icon=ft.Icons.ARROW_BACK,
-                        on_click=lambda e: asyncio.create_task(self.page.push_route("/")),
+                        on_click=lambda e: self.page.run_task(self.page.push_route, "/"),
                     ),
                 ],
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,

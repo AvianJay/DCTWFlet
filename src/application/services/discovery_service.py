@@ -1,6 +1,6 @@
 """Discovery service"""
 
-from typing import List
+from typing import Dict, List, Optional
 import logging
 
 from domain.discovery.repositories import (
@@ -8,7 +8,13 @@ from domain.discovery.repositories import (
     ServerRepository,
     TemplateRepository,
 )
-from domain.discovery.entities import Bot, Server, Template
+from domain.discovery.entities import (
+    Bot,
+    BotDetails,
+    Server,
+    ServerDetails,
+    Template,
+)
 from domain.discovery.value_objects import FilterCriteria, SortOption
 from domain.discovery.aggregates import (
     BotCollection,
@@ -37,7 +43,7 @@ class DiscoveryService:
     async def list_bots(
         self,
         filter_criteria: FilterCriteria = None,
-        sort_option: SortOption = SortOption.NEWEST,
+        sort_option: SortOption = SortOption.DEFAULT,
     ) -> List[Bot]:
         """
         List Bots
@@ -88,10 +94,20 @@ class DiscoveryService:
 
         return bot
 
+    async def get_bot_details(
+        self, bot_id: int, author_ids: Optional[List[str]] = None
+    ) -> BotDetails:
+        """Authors and partner flag shown on the official bot page."""
+        return await self._bot_repo.find_details(bot_id, author_ids or [])
+
+    async def resolve_partner_flags(self, bot_ids: List[int]) -> Dict[int, bool]:
+        """Partner flag of the given bots, resolved from the website."""
+        return await self._bot_repo.resolve_partner_flags(list(bot_ids))
+
     async def list_servers(
         self,
         filter_criteria: FilterCriteria = None,
-        sort_option: SortOption = SortOption.NEWEST,
+        sort_option: SortOption = SortOption.DEFAULT,
     ) -> List[Server]:
         """List servers"""
         logger.info(
@@ -123,10 +139,14 @@ class DiscoveryService:
 
         return server
 
+    async def get_server_details(self, server_id: int) -> ServerDetails:
+        """Admins and comments shown on the official server page."""
+        return await self._server_repo.find_details(server_id)
+
     async def list_templates(
         self,
         filter_criteria: FilterCriteria = None,
-        sort_option: SortOption = SortOption.NEWEST,
+        sort_option: SortOption = SortOption.DEFAULT,
     ) -> List[Template]:
         """List templates"""
         logger.info(

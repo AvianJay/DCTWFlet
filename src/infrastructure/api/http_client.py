@@ -90,6 +90,41 @@ class AsyncHttpClient:
             logger.error(f"Unexpected error: {e}")
             raise
 
+    async def post_text(
+        self,
+        endpoint: str,
+        content: str,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> str:
+        """Async POST request that returns the raw response text.
+
+        Used for endpoints that answer with a non-JSON payload (for example
+        the React flight body of the website's server actions).
+        """
+        if not self._client:
+            raise RuntimeError(
+                "Client not initialized. Use 'async with' context manager"
+            )
+
+        url = f"{self._base_url}/{endpoint.lstrip('/')}"
+        logger.debug(f"POST {url}")
+
+        try:
+            response = await self._client.post(
+                url, content=content.encode("utf-8"), headers=headers
+            )
+            response.raise_for_status()
+            return response.text
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error {e.response.status_code}: {e}")
+            raise
+        except httpx.RequestError as e:
+            logger.error(f"Request error: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            raise
+
     async def download(self, url: str) -> bytes:
         """Download file"""
         if not self._client:

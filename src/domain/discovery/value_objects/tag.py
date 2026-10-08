@@ -70,5 +70,8 @@ class TemplateTag(Tag):
         "gaming",
         "anime",
         "art",
+        "support",
+        "fun",
+        "large",
         "nsfw",
     }

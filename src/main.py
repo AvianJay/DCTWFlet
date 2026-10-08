@@ -19,9 +19,11 @@ from presentation.pages import (
     ServerDetailPage,
     TemplateDetailPage,
 )
+from presentation.components import ApiKeyDialog
 from infrastructure.di import get_container
+from infrastructure.api import DctwApiClient
 from infrastructure.image import ImageServer
-from application.services import PreferenceService
+from application.services import DiscoveryService, PreferenceService
 from infrastructure.config import initialize_settings
 
 
@@ -123,7 +125,7 @@ async def main(page: ft.Page):
 
     def navigate(route: str):
         if hasattr(page, "push_route"):
-            asyncio.create_task(page.push_route(route))
+            page.run_task(page.push_route, route)
         else:
             page.go(route)
 
@@ -132,6 +134,7 @@ async def main(page: ft.Page):
     page.bgcolor = ft.Colors.SURFACE
 
     pref_service: PreferenceService = container.resolve(PreferenceService)
+    prefs = None
     try:
         prefs = await pref_service.load_preferences()
         page.theme_mode = prefs.theme.value
@@ -140,8 +143,8 @@ async def main(page: ft.Page):
         logger.error(str(e))
         page.theme_mode = ft.ThemeMode.SYSTEM
 
-    page.theme = ft.Theme(navigation_bar_theme=ft.NavigationBarTheme(height=80))
-    page.dark_theme = ft.Theme(navigation_bar_theme=ft.NavigationBarTheme(height=80))
+    page.theme = ft.Theme(navigation_bar_theme=ft.NavigationBarTheme(height=56))
+    page.dark_theme = ft.Theme(navigation_bar_theme=ft.NavigationBarTheme(height=56))
 
     image_server: ImageServer = container.resolve(ImageServer)
 
@@ -155,75 +158,131 @@ async def main(page: ft.Page):
 
     current_tab = [0]
 
+    tab_titles = (
+        "DCTW - 機器人清單",
+        "DCTW - 伺服器清單",
+        "DCTW - 模板清單",
+        "DCTW - 設置",
+    )
+
     bot_page = BotListPage(page)
     server_page = ServerListPage(page)
     template_page = TemplateListPage(page)
-    settings_page = SettingsPage(page)
 
-    def create_home_view() -> ft.View:
-        content_container = ft.Container(expand=True)
+    # Every tab is built once and kept alive. Rebuilding the pages on each tab
+    # switch re-parented the same widgets and started competing background
+    # tasks, which could leave the UI stuck on the previous tab.
+    built_tabs: dict[int, ft.Control] = {}
+    tab_stack = ft.Stack(expand=True)
 
-        def on_tab_changed(e):
-            """Tab change event handler"""
-            index = e.control.selected_index
-            current_tab[0] = index
+    def tab_content(index: int) -> ft.Control:
+        """Return the content of a tab, building it on first use."""
+        control = built_tabs.get(index)
+        if control is not None:
+            return control
 
-            if index == 0:
-                page.title = "DCTW - 機器人清單"
-                content_container.content = bot_page.build()
-            elif index == 1:
-                page.title = "DCTW - 伺服器清單"
-                content_container.content = server_page.build()
-            elif index == 2:
-                page.title = "DCTW - 模板清單"
-                content_container.content = template_page.build()
-            elif index == 3:
-                page.title = "DCTW - 設置"
-                content_container.content = settings_page.build()
+        if index == 0:
+            control = bot_page.build()
+        elif index == 1:
+            control = server_page.build()
+        elif index == 2:
+            control = template_page.build()
+        else:
+            control = settings_page.build()
 
+        control.visible = False
+        built_tabs[index] = control
+        tab_stack.controls.append(control)
+        return control
+
+    def reload_data_tabs() -> None:
+        """Rebuild the data tabs after the API key changed."""
+        for index in (0, 1, 2):
+            control = built_tabs.pop(index, None)
+            if control in tab_stack.controls:
+                tab_stack.controls.remove(control)
+        select_tab(current_tab[0])
+        page.update()
+
+    settings_page = SettingsPage(page, on_data_changed=reload_data_tabs)
+
+    def select_tab(index: int) -> None:
+        current_tab[0] = index
+        page.title = tab_titles[index]
+        tab_content(index)
+        for tab_index, control in built_tabs.items():
+            control.visible = tab_index == index
+        update_tab_colors()
+
+    # Custom compact bottom bar (the Material one is always too tall).
+    tab_icons = (
+        (ft.Icons.SMART_TOY_OUTLINED, ft.Icons.SMART_TOY, "機器人"),
+        (ft.Icons.DNS_OUTLINED, ft.Icons.DNS, "伺服器"),
+        (ft.Icons.COPY_ALL_OUTLINED, ft.Icons.COPY_ALL, "模板"),
+        (ft.Icons.SETTINGS_OUTLINED, ft.Icons.SETTINGS, "設置"),
+    )
+    tab_controls: list[tuple[ft.Container, ft.Icon, ft.Text, ft.Icon, ft.Icon]] = []
+
+    def update_tab_colors() -> None:
+        for index, (container, icon, label, icon_off, icon_on) in enumerate(
+            tab_controls
+        ):
+            is_selected = index == current_tab[0]
+            color = (
+                ft.Colors.ON_SECONDARY_CONTAINER
+                if is_selected
+                else ft.Colors.ON_SURFACE_VARIANT
+            )
+            container.bgcolor = ft.Colors.SECONDARY_CONTAINER if is_selected else None
+            icon.name = icon_on if is_selected else icon_off
+            icon.color = color
+            label.color = color
+
+    def create_tab_button(index: int) -> ft.Control:
+        icon_off, icon_on, text = tab_icons[index]
+        icon = ft.Icon(icon_off, size=26, color=ft.Colors.ON_SURFACE_VARIANT)
+        label = ft.Text(text, size=14, color=ft.Colors.ON_SURFACE_VARIANT)
+
+        def on_click(e, tab_index=index):
+            select_tab(tab_index)
             page.update()
 
-        navigation_bar = ft.NavigationBar(
-            destinations=[
-                ft.NavigationBarDestination(
-                    icon=ft.Icons.SMART_TOY_OUTLINED,
-                    selected_icon=ft.Icons.SMART_TOY,
-                    label="機器人",
-                ),
-                ft.NavigationBarDestination(
-                    icon=ft.Icons.DNS_OUTLINED,
-                    selected_icon=ft.Icons.DNS,
-                    label="伺服器",
-                ),
-                ft.NavigationBarDestination(
-                    icon=ft.Icons.COPY_ALL_OUTLINED,
-                    selected_icon=ft.Icons.COPY_ALL,
-                    label="範本",
-                ),
-                ft.NavigationBarDestination(
-                    icon=ft.Icons.SETTINGS_OUTLINED,
-                    selected_icon=ft.Icons.SETTINGS,
-                    label="設置",
-                ),
-            ],
-            selected_index=current_tab[0],
-            on_change=on_tab_changed,
+        container = ft.Container(
+            content=ft.Column(
+                [icon, label],
+                spacing=1,
+                alignment=ft.MainAxisAlignment.CENTER,
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            ),
+            expand=True,
+            height=62,
+            border_radius=14,
+            alignment=ft.Alignment(0, 0),
+            ink=True,
+            on_click=on_click,
         )
+        tab_controls.append((container, icon, label, icon_off, icon_on))
+        return container
 
-        if current_tab[0] == 0:
-            content_container.content = bot_page.build()
-        elif current_tab[0] == 1:
-            content_container.content = server_page.build()
-        elif current_tab[0] == 2:
-            content_container.content = template_page.build()
-        else:
-            content_container.content = settings_page.build()
+    navigation_bar = ft.Container(
+        content=ft.Row(
+            [create_tab_button(index) for index in range(len(tab_icons))],
+            spacing=4,
+        ),
+        height=74,
+        padding=ft.padding.symmetric(horizontal=6, vertical=6),
+        bgcolor=ft.Colors.SURFACE_CONTAINER,
+        alignment=ft.Alignment(0, 0),
+    )
+
+    def create_home_view() -> ft.View:
+        select_tab(current_tab[0])
 
         return ft.View(
             route="/",
             controls=[
                 ft.Column(
-                    [content_container, navigation_bar],
+                    [tab_stack, navigation_bar],
                     spacing=0,
                     expand=True,
                 )
@@ -231,8 +290,26 @@ async def main(page: ft.Page):
             padding=0,
         )
 
+    def show_related_bot_tag(tag_name: str) -> None:
+        """Open the bot list filtered by the tag tapped on a bot page."""
+        bot_page.show_related_tag(tag_name)
+        select_tab(0)
+        navigate("/")
+
+    def show_related_server_tag(tag_name: str) -> None:
+        """Open the server list filtered by the tag tapped on a server page."""
+        server_page.show_related_tag(tag_name)
+        select_tab(1)
+        navigate("/")
+
+    def show_related_template_tag(tag_name: str) -> None:
+        """Open the template list filtered by the tag tapped on a template page."""
+        template_page.show_related_tag(tag_name)
+        select_tab(2)
+        navigate("/")
+
     def create_bot_detail_view(bot_id: str) -> ft.View:
-        detail_page = BotDetailPage(page, bot_id)
+        detail_page = BotDetailPage(page, bot_id, on_tag_click=show_related_bot_tag)
         return ft.View(
             route=f"/bot/{bot_id}",
             controls=[ft.Container(content=detail_page.build(), expand=True)],
@@ -249,7 +326,9 @@ async def main(page: ft.Page):
         )
 
     def create_server_detail_view(server_id: str) -> ft.View:
-        detail_page = ServerDetailPage(page, server_id)
+        detail_page = ServerDetailPage(
+            page, server_id, on_tag_click=show_related_server_tag
+        )
         return ft.View(
             route=f"/server/{server_id}",
             controls=[ft.Container(content=detail_page.build(), expand=True)],
@@ -266,12 +345,14 @@ async def main(page: ft.Page):
         )
 
     def create_template_detail_view(template_id: str) -> ft.View:
-        detail_page = TemplateDetailPage(page, template_id)
+        detail_page = TemplateDetailPage(
+            page, template_id, on_tag_click=show_related_template_tag
+        )
         return ft.View(
             route=f"/template/{template_id}",
             controls=[ft.Container(content=detail_page.build(), expand=True)],
             appbar=ft.AppBar(
-                title=ft.Text("範本詳情"),
+                title=ft.Text("模板詳情"),
                 bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST,
                 leading=ft.IconButton(
                     icon=ft.Icons.ARROW_BACK,
@@ -282,27 +363,39 @@ async def main(page: ft.Page):
             padding=0,
         )
 
+    # The home view is created only once. Keeping the same view mounted below a
+    # detail page preserves the loaded lists (and their scroll position) when
+    # the detail page is closed.
+    home_view = create_home_view()
+
+    def _reset_to_home() -> None:
+        """Drop every pushed detail view, keeping the live home view."""
+        if page.views and page.views[0] is home_view:
+            del page.views[1:]
+            return
+        page.views.clear()
+        page.views.append(home_view)
+
     def route_change(e):
         try:
-            logger.info("Route change: %s", page.route)
-            page.views.clear()
+            route = page.route or "/"
+            logger.info("Route change: %s", route)
 
-            if page.route in ("", "/"):
-                page.views.append(create_home_view())
-            elif page.route.startswith("/bot/"):
-                bot_id = page.route.split("/bot/")[1]
-                page.views.append(create_home_view())
-                page.views.append(create_bot_detail_view(bot_id))
-            elif page.route.startswith("/server/"):
-                server_id = page.route.split("/server/")[1]
-                page.views.append(create_home_view())
-                page.views.append(create_server_detail_view(server_id))
-            elif page.route.startswith("/template/"):
-                template_id = page.route.split("/template/")[1]
-                page.views.append(create_home_view())
-                page.views.append(create_template_detail_view(template_id))
+            if route.startswith("/bot/"):
+                _reset_to_home()
+                page.views.append(create_bot_detail_view(route.split("/bot/")[1]))
+            elif route.startswith("/server/"):
+                _reset_to_home()
+                page.views.append(
+                    create_server_detail_view(route.split("/server/")[1])
+                )
+            elif route.startswith("/template/"):
+                _reset_to_home()
+                page.views.append(
+                    create_template_detail_view(route.split("/template/")[1])
+                )
             else:
-                page.views.append(create_home_view())
+                _reset_to_home()
 
             logger.info("Views rendered: %s", len(page.views))
             page.update()
@@ -342,8 +435,9 @@ async def main(page: ft.Page):
             page.update()
 
     def view_pop(e):
-        page.views.pop()
-        top_view = page.views[-1]
+        if len(page.views) > 1:
+            page.views.pop()
+        top_view = page.views[-1] if page.views else home_view
         navigate(top_view.route)
 
     page.on_route_change = route_change
@@ -352,6 +446,24 @@ async def main(page: ft.Page):
     if not page.route:
         page.route = "/"
     route_change(None)
+
+    if prefs is not None and not prefs.api_key.is_set:
+
+        async def show_api_key_onboarding():
+            await asyncio.sleep(1.0)
+            try:
+                dialog = ApiKeyDialog(
+                    page=page,
+                    preference_service=pref_service,
+                    discovery_service=container.resolve(DiscoveryService),
+                    api_client=container.resolve(DctwApiClient),
+                    on_saved=reload_data_tabs,
+                )
+                dialog.show(dismissible=True)
+            except Exception:
+                logger.exception("Failed to show API key onboarding dialog")
+
+        page.run_task(show_api_key_onboarding)
 
 
 if __name__ == "__main__":
