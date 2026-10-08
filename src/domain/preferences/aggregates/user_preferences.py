@@ -34,7 +34,7 @@ class PreferencesSavedEvent(DomainEvent):
 
 
 class UserPreferences(AggregateRoot):
-    CONFIG_VERSION = 5
+    CONFIG_VERSION = 6
 
     def __init__(
         self,
@@ -43,6 +43,8 @@ class UserPreferences(AggregateRoot):
         nsfw_filter: NsfwFilter = None,
         update_check: UpdateCheck = UpdateCheck.POPUP,
         home_index: int = 0,
+        dctw_user_id: str = "",
+        dctw_user_name: str = "",
     ):
         super().__init__()
         self._theme = theme
@@ -50,6 +52,8 @@ class UserPreferences(AggregateRoot):
         self._nsfw_filter = nsfw_filter or NsfwFilter(False)
         self._update_check = update_check
         self._home_index = home_index
+        self._dctw_user_id = str(dctw_user_id or "")
+        self._dctw_user_name = str(dctw_user_name or "")
 
     @property
     def theme(self) -> Theme:
@@ -70,6 +74,21 @@ class UserPreferences(AggregateRoot):
     @property
     def home_index(self) -> int:
         return self._home_index
+
+    @property
+    def dctw_user_id(self) -> str:
+        """Discord id of the account that is signed in on the website."""
+        return self._dctw_user_id
+
+    @property
+    def dctw_user_name(self) -> str:
+        """Display name of that account."""
+        return self._dctw_user_name
+
+    def set_dctw_user(self, user_id: str, user_name: str) -> None:
+        """Remember who signed in so the review form can greet them."""
+        self._dctw_user_id = str(user_id or "")
+        self._dctw_user_name = str(user_name or "")
 
     def change_theme(self, theme: Theme) -> None:
         """Change theme"""
@@ -116,6 +135,8 @@ class UserPreferences(AggregateRoot):
             "nsfw": self._nsfw_filter.is_enabled,
             "app_update_check": self._update_check.value,
             "home_index": self._home_index,
+            "dctw_user_id": self._dctw_user_id,
+            "dctw_user_name": self._dctw_user_name,
         }
 
     @classmethod
@@ -127,4 +148,6 @@ class UserPreferences(AggregateRoot):
             nsfw_filter=NsfwFilter(data.get("nsfw", False)),
             update_check=UpdateCheck.from_string(data.get("app_update_check", "popup")),
             home_index=data.get("home_index", 0),
+            dctw_user_id=data.get("dctw_user_id", ""),
+            dctw_user_name=data.get("dctw_user_name", ""),
         )

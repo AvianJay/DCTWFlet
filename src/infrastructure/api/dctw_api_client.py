@@ -48,6 +48,32 @@ class DctwApiClient:
     # (bot authors) to their public profile.
     GET_USERS_ACTION = "40d2eecba887e6edbe579ce1858b12b97b66aa318d"
 
+    # Review server actions of the official website. They only accept the
+    # login session of the site (an API key is rejected), so a review is
+    # sent from a WebView that carries that session - see
+    # ``presentation.components.DctwCommentDialog``. Reading the list works
+    # from here as well, which is used to refresh the section.
+    COMMENT_ACTIONS: Dict[str, Dict[str, str]] = {
+        "bots": {
+            "insert": "78013e5bf60090c84bf81e63fbea7775435577a5e6",
+            "edit": "70990886808596af207d6d8ec3d905a4312b106c70",
+            "delete": "603605aa61fe75fe3cd07fd291415003e35c391943",
+            "list": "404bfb2f51e44d89bd0ccd5ebce31a4498780e1e59",
+        },
+        "servers": {
+            "insert": "7892376f97e24bdd8c74c2d89ebdf41c270c32cc5e",
+            "edit": "7008cf95b2f13fbe656662227dde0a74c9da493c32",
+            "delete": "601364561c331aba7550224175633a1e0d1c4a5f4a",
+            "list": "409de9f637fd530bbbfc1bfa7e6790c61e6eda895e",
+        },
+        "templates": {
+            "insert": "7801357d9e514f52097b383ae3f4c1d0f58c9cf72a",
+            "edit": "70ca1e37e3ced2efae0fcc54560427cd9e06d27507",
+            "delete": "6003050bc14630fcedc9d735c05930fbecd9280be2",
+            "list": "4066734a6de5dc79145de79a9942369ef89eaccf4a",
+        },
+    }
+
     # Server action used by the official website to read a single bot record
     # (the public API does not expose the partner flag).
     GET_BOT_ACTION = "601cebfbdd90674fa83db025737892d230455e1ffb"
@@ -126,6 +152,53 @@ class DctwApiClient:
         """Get bot comments."""
         logger.info(f"Fetching comments for bot {bot_id}")
         return await self._get_collection(f"/bots/{bot_id}/comments/")
+
+    @classmethod
+    def comment_actions(cls, item_type: str) -> Dict[str, str]:
+        """Return the review server actions of one item type."""
+        return dict(cls.COMMENT_ACTIONS.get(str(item_type or "").strip().lower(), {}))
+
+    async def get_comments(
+        self, item_type: str, item_id: Union[int, str]
+    ) -> List[Dict[str, Any]]:
+        """Read the reviews of an item through the website's own action.
+
+        The public API embeds the reviews in the item itself, but the
+        website reads and refreshes them with a server action, so a review
+        that was just sent shows up here right away.
+        """
+        actions = self.comment_actions(item_type)
+        action_id = actions.get("list")
+        if not action_id:
+            return []
+
+        endpoint = f"/{item_type}/{item_id}/"
+        headers = {
+            "Next-Action": action_id,
+            "Content-Type": "text/plain;charset=UTF-8",
+            "Accept": "text/x-component",
+            "Origin": self._base_url,
+            "Referer": f"{self._base_url}{endpoint}",
+        }
+
+        try:
+            async with AsyncHttpClient(
+                self._base_url, headers={"User-Agent": self._user_agent}
+            ) as client:
+                payload = await client.post_text(
+                    endpoint, json.dumps([str(item_id)]), headers=headers
+                )
+        except Exception as error:
+            logger.warning(
+                f"Failed to load the reviews of {item_type} {item_id}: {error}"
+            )
+            return []
+
+        data = self._extract_action_payload(payload)
+        if not isinstance(data, list):
+            return []
+
+        return [item for item in data if isinstance(item, dict)]
 
     async def get_bot(self, bot_id: int) -> Optional[Dict[str, Any]]:
         """Get a single bot by ID. Returns None when the API answers 404."""

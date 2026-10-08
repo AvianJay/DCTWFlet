@@ -3,13 +3,19 @@ import asyncio
 import flet as ft
 import logging
 from typing import List, Optional
-from application.services import DiscoveryService, UserProfileService
+from application.services import (
+    DiscoveryService,
+    PreferenceService,
+    UserProfileService,
+)
 from domain.discovery.entities import Server
+from domain.discovery.value_objects import Comment
 from domain.shared import EntityNotFoundException
 from infrastructure.api import DctwApiClient
 from infrastructure.di import get_container
 from infrastructure.image import ImageServer
 from presentation.components import (
+    CommentPoster,
     CommentsSection,
     VoteButton,
     build_avatar,
@@ -44,6 +50,15 @@ class ServerDetailPage:
         self._server: Optional[Server] = None
         self._admin_container: Optional[ft.Container] = None
         self._comments_container: Optional[ft.Container] = None
+        self._comments_section: Optional[CommentsSection] = None
+        self.comment_poster = CommentPoster(
+            page=page,
+            item_type="servers",
+            item_id=server_id,
+            api_client=self.api_client,
+            preference_service=self.container.resolve(PreferenceService),
+            on_comments=self._on_comments_changed,
+        )
 
     def _get_tag_info(self, tag_name: str) -> tuple[str, str]:
         """Get tag display name and icon"""
@@ -294,17 +309,34 @@ class ServerDetailPage:
         )
 
     def _create_comments_placeholder(self, server: Server) -> ft.Control:
-        """Comments only arrive with the detail payload, so start loading."""
-        self._comments_container = ft.Container(
-            content=CommentsSection(
-                page=self.page,
-                comments=server.comments,
-                load_profiles=self._load_reviewer_profiles,
-                cache_image=self._cache_image,
-                loading=not server.comments,
-            ).build()
+        """Review list and review form, like the official page shows them."""
+        self.comment_poster.sync_user()
+        self._comments_section = CommentsSection(
+            page=self.page,
+            comments=server.comments,
+            load_profiles=self._load_reviewer_profiles,
+            cache_image=self._cache_image,
+            loading=not server.comments,
+            on_submit=self.comment_poster.submit,
+            on_delete=self.comment_poster.delete,
+            user_id=self.comment_poster.user_id,
+            user_name=self.comment_poster.user_name,
         )
+        self._comments_container = ft.Container(content=self._comments_section.build())
         return self._comments_container
+
+    def _on_comments_changed(
+        self, comments: List[Comment], user_id: str, user_name: str
+    ) -> None:
+        """Show the reviews the website returned after a review action."""
+        if self._comments_section is None:
+            return
+
+        try:
+            self._comments_section.set_comments(comments, user_id, user_name)
+            self.page.update()
+        except Exception:
+            logger.debug("Server detail page closed before the reviews arrived")
 
     async def _load_reviewer_profiles(self, user_ids: List[str]):
         """Resolve the reviewers through the official server page action."""
@@ -336,13 +368,8 @@ class ServerDetailPage:
                     admins, profiles, self._cache_image
                 )
 
-            if self._comments_container is not None and details is not None:
-                self._comments_container.content = CommentsSection(
-                    page=self.page,
-                    comments=comments,
-                    load_profiles=self._load_reviewer_profiles,
-                    cache_image=self._cache_image,
-                ).build()
+            if self._comments_section is not None and details is not None:
+                self._comments_section.set_comments(comments)
 
             self.page.update()
         except Exception:

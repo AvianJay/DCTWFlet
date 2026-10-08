@@ -2,13 +2,19 @@ import flet as ft
 import asyncio
 import logging
 from typing import List, Optional
-from application.services import DiscoveryService, UserProfileService
+from application.services import (
+    DiscoveryService,
+    PreferenceService,
+    UserProfileService,
+)
 from domain.discovery.entities import Bot, BotAuthor
+from domain.discovery.value_objects import Comment
 from domain.shared import EntityNotFoundException
 from infrastructure.di import get_container
 from infrastructure.api import DctwApiClient
 from infrastructure.image import ImageServer
 from presentation.components import (
+    CommentPoster,
     CommentsSection,
     VoteButton,
     build_avatar,
@@ -45,6 +51,15 @@ class BotDetailPage:
         self._badges_container: Optional[ft.Container] = None
         self._author_container: Optional[ft.Container] = None
         self._comments_container: Optional[ft.Container] = None
+        self._comments_section: Optional[CommentsSection] = None
+        self.comment_poster = CommentPoster(
+            page=page,
+            item_type="bots",
+            item_id=bot_id,
+            api_client=self.api_client,
+            preference_service=self.container.resolve(PreferenceService),
+            on_comments=self._on_comments_changed,
+        )
 
     def _get_tag_info(self, tag_name: str) -> tuple[str, str]:
         """Get tag display name and icon"""
@@ -318,17 +333,34 @@ class BotDetailPage:
         return build_user_row("作者", authors, self._cache_image)
 
     def _create_comments_section(self, bot: Bot) -> ft.Control:
-        """Comments only arrive with the detail payload, so start loading."""
-        self._comments_container = ft.Container(
-            content=CommentsSection(
-                page=self.page,
-                comments=bot.comments,
-                load_profiles=self._load_reviewer_profiles,
-                cache_image=self._cache_image,
-                loading=not bot.comments,
-            ).build()
+        """Review list and review form, like the official page shows them."""
+        self.comment_poster.sync_user()
+        self._comments_section = CommentsSection(
+            page=self.page,
+            comments=bot.comments,
+            load_profiles=self._load_reviewer_profiles,
+            cache_image=self._cache_image,
+            loading=not bot.comments,
+            on_submit=self.comment_poster.submit,
+            on_delete=self.comment_poster.delete,
+            user_id=self.comment_poster.user_id,
+            user_name=self.comment_poster.user_name,
         )
+        self._comments_container = ft.Container(content=self._comments_section.build())
         return self._comments_container
+
+    def _on_comments_changed(
+        self, comments: List[Comment], user_id: str, user_name: str
+    ) -> None:
+        """Show the reviews the website returned after a review action."""
+        if self._comments_section is None:
+            return
+
+        try:
+            self._comments_section.set_comments(comments, user_id, user_name)
+            self.page.update()
+        except Exception:
+            logger.debug("Bot detail page closed before the reviews arrived")
 
     async def _load_reviewer_profiles(self, user_ids: List[str]) -> List[BotAuthor]:
         """Resolve the reviewers through the official bot page action."""
@@ -371,15 +403,10 @@ class BotDetailPage:
 
     def _update_comments(self, comments) -> None:
         """Swap the comment placeholder for the reviews of the website."""
-        if self._comments_container is None:
+        if self._comments_section is None:
             return
         try:
-            self._comments_container.content = CommentsSection(
-                page=self.page,
-                comments=comments,
-                load_profiles=self._load_reviewer_profiles,
-                cache_image=self._cache_image,
-            ).build()
+            self._comments_section.set_comments(comments)
         except Exception:
             logger.debug("Bot detail page closed before the comments arrived")
 

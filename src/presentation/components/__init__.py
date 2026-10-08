@@ -2,7 +2,9 @@
 
 from .api_key_dialog import ApiKeyDialog
 from .avatar_image import build_avatar
+from .comment_poster import CommentPoster
 from .comments_section import CommentsSection, build_stars
+from .dctw_comment_dialog import CommentResult, DctwCommentDialog
 from .markdown_view import build_intro_markdown, convert_discord_emojis
 from .partner_badge import PARTNER_BADGE_TAG, build_partner_badge
 from .social_links import build_social_links_section
@@ -13,7 +15,10 @@ from .vote_button import VoteButton
 
 __all__ = [
     "ApiKeyDialog",
+    "CommentPoster",
+    "CommentResult",
     "CommentsSection",
+    "DctwCommentDialog",
     "PARTNER_BADGE_TAG",
     "TagFilterDialog",
     "Toast",
