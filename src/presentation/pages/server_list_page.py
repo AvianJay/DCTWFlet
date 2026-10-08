@@ -17,7 +17,12 @@ from domain.discovery.value_objects import (
 from domain.discovery.entities import Server
 from infrastructure.api import ApiKeyMissingError, InvalidApiKeyError
 from infrastructure.di import get_container
-from presentation.components import TagFilterDialog, Toast, build_avatar
+from presentation.components import (
+    TagFilterDialog,
+    Toast,
+    build_avatar,
+    build_partner_badge,
+)
 from presentation.tag_mappings import SERVER_TAGS, SERVER_TAG_FILTERS
 from presentation.url_helper import open_url
 
@@ -403,9 +408,7 @@ class ServerListPage:
 
         badges = []
         if server.is_partnered:
-            badges.append(
-                ft.Icon(ft.Icons.WORKSPACE_PREMIUM, color=ft.Colors.PURPLE, size=16)
-            )
+            badges.append(build_partner_badge())
         if server.pinned:
             badges.append(
                 ft.Icon(ft.Icons.PUSH_PIN, color=ft.Colors.ORANGE, size=16)
@@ -452,7 +455,7 @@ class ServerListPage:
                             [
                                 ft.Row(
                                     [
-                                        ft.Icon(ft.Icons.STAR, size=16),
+                                        ft.Icon(ft.Icons.HOW_TO_VOTE, size=16),
                                         ft.Text(str(server.statistics.votes), size=14),
                                     ],
                                     spacing=5,
@@ -461,7 +464,17 @@ class ServerListPage:
                                     [
                                         ft.Icon(ft.Icons.PEOPLE, size=16),
                                         ft.Text(
-                                            f"{server.statistics.members} 成員",
+                                            f"{server.online_members:,}",
+                                            size=14,
+                                            color=ft.Colors.GREEN,
+                                        ),
+                                        ft.Text(
+                                            "/",
+                                            size=14,
+                                            color=ft.Colors.ON_SURFACE_VARIANT,
+                                        ),
+                                        ft.Text(
+                                            f"{server.statistics.members:,}",
                                             size=14,
                                         ),
                                     ],

@@ -450,7 +450,7 @@ class TemplateListPage:
                             [
                                 ft.Row(
                                     [
-                                        ft.Icon(ft.Icons.STAR, size=16),
+                                        ft.Icon(ft.Icons.HOW_TO_VOTE, size=16),
                                         ft.Text(
                                             str(template.statistics.votes), size=14
                                         ),

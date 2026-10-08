@@ -15,6 +15,7 @@ from presentation.components import (
     VoteButton,
     build_avatar,
     build_admin_section,
+    build_partner_badge,
     build_social_links_section,
 )
 from presentation.tag_mappings import SERVER_TAGS
@@ -204,9 +205,9 @@ class ServerDetailPage:
     def _create_statistics_section(self, server: Server) -> ft.Control:
         """Create the member counters shown on the official page."""
         counters = [
-            (ft.Icons.GROUP, server.statistics.members, "成員數量"),
-            (ft.Icons.CIRCLE, server.online_members, "在線人數"),
-            (ft.Icons.STAR, server.statistics.votes, "投票數"),
+            (ft.Icons.GROUP, server.statistics.members, "成員數量", None),
+            (ft.Icons.CIRCLE, server.online_members, "在線人數", ft.Colors.GREEN),
+            (ft.Icons.HOW_TO_VOTE, server.statistics.votes, "投票數", None),
         ]
 
         return ft.Container(
@@ -214,17 +215,18 @@ class ServerDetailPage:
                 [
                     ft.Column(
                         [
-                            ft.Icon(icon, size=28),
+                            ft.Icon(icon, size=28, color=color),
                             ft.Text(
                                 f"{value:,}",
                                 size=18,
                                 weight=ft.FontWeight.BOLD,
+                                color=color,
                             ),
                             ft.Text(label, size=13, color=ft.Colors.GREY),
                         ],
                         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                     )
-                    for icon, value, label in counters
+                    for icon, value, label, color in counters
                 ],
                 alignment=ft.MainAxisAlignment.CENTER,
                 spacing=36,
@@ -404,18 +406,7 @@ class ServerDetailPage:
             return ft.Container(height=0)
 
         return ft.Row(
-            [
-                ft.ElevatedButton(
-                    content=ft.Text("DCTW 合作夥伴"),
-                    color=ft.Colors.WHITE,
-                    icon=ft.Icons.STAR,
-                    icon_color=ft.Colors.WHITE,
-                    bgcolor=ft.Colors.GREEN,
-                    on_click=lambda e: self.page.open(
-                        ft.SnackBar(content=ft.Text("此伺服器為 DCTW 合作夥伴。"))
-                    ),
-                )
-            ],
+            [build_partner_badge("此伺服器為 DCTW 合作夥伴。")],
             alignment=ft.MainAxisAlignment.CENTER,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
         )

@@ -13,6 +13,7 @@ from presentation.components import (
     CommentsSection,
     VoteButton,
     build_avatar,
+    build_partner_badge,
     build_social_links_section,
     build_user_row,
 )
@@ -322,18 +323,7 @@ class BotDetailPage:
             )
 
         if partnered:
-            badges.append(
-                ft.ElevatedButton(
-                    content="DCTW 合作夥伴",
-                    color=ft.Colors.WHITE,
-                    icon=ft.Icons.STAR,
-                    icon_color=ft.Colors.WHITE,
-                    bgcolor=ft.Colors.GREEN,
-                    on_click=lambda e: self.page.open(
-                        ft.SnackBar(content=ft.Text("此機器人為 DCTW 合作夥伴。"))
-                    ),
-                )
-            )
+            badges.append(build_partner_badge("此機器人為 DCTW 合作夥伴。"))
 
         if not badges:
             return ft.Container(height=0)
@@ -513,7 +503,7 @@ class BotDetailPage:
                 [
                     ft.Column(
                         [
-                            ft.Icon(ft.Icons.STAR, size=32),
+                            ft.Icon(ft.Icons.HOW_TO_VOTE, size=32),
                             self._vote_count_text,
                             ft.Text("投票數", size=14, color=ft.Colors.GREY),
                             VoteButton(

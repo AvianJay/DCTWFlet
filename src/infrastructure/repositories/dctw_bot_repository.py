@@ -47,6 +47,10 @@ class DctwBotRepository(BotRepository):
     PARTNER_CACHE_PREFIX = "bots:partner:"
     USER_CACHE_PREFIX = "users:profile:"
 
+    # Partner status changes very rarely, so the flag read from the website
+    # action is kept for hours instead of minutes.
+    PARTNER_TTL = 6 * 60 * 60
+
     def __init__(self, api_client: DctwApiClient, cache_manager: CacheManager):
         self._api_client = api_client
         self._cache = cache_manager
@@ -157,8 +161,37 @@ class DctwBotRepository(BotRepository):
             or to_bool(data.get("partner"))
             or to_bool(data.get("is_partnered", False))
         )
-        await self._cache.set(cache_key, is_partnered, ttl=600)
+        await self._cache.set(cache_key, is_partnered, ttl=self.PARTNER_TTL)
         return is_partnered
+
+    async def resolve_partner_flags(self, bot_ids: List[int]) -> Dict[int, bool]:
+        """Return the partner flag of every given bot.
+
+        The public list endpoint stopped returning the flag, so the ones the
+        website action knows about are cached and only the unknown ids are
+        fetched (a few at a time, to stay gentle with the website).
+        """
+        flags: Dict[int, bool] = {}
+        missing: List[int] = []
+
+        for bot_id in dict.fromkeys(bot_ids):
+            cached = await self._cache.get(f"{self.PARTNER_CACHE_PREFIX}{bot_id}")
+            if isinstance(cached, bool):
+                flags[bot_id] = cached
+            else:
+                missing.append(bot_id)
+
+        if not missing:
+            return flags
+
+        semaphore = asyncio.Semaphore(4)
+
+        async def resolve(bot_id: int) -> None:
+            async with semaphore:
+                flags[bot_id] = await self._load_partner_status(bot_id)
+
+        await asyncio.gather(*(resolve(bot_id) for bot_id in missing))
+        return flags
 
     async def _load_authors(
         self, bot_id: int, author_ids: List[str]

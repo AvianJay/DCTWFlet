@@ -1,6 +1,6 @@
 """Discovery service"""
 
-from typing import List, Optional
+from typing import Dict, List, Optional
 import logging
 
 from domain.discovery.repositories import (
@@ -99,6 +99,10 @@ class DiscoveryService:
     ) -> BotDetails:
         """Authors and partner flag shown on the official bot page."""
         return await self._bot_repo.find_details(bot_id, author_ids or [])
+
+    async def resolve_partner_flags(self, bot_ids: List[int]) -> Dict[int, bool]:
+        """Partner flag of the given bots, resolved from the website."""
+        return await self._bot_repo.resolve_partner_flags(list(bot_ids))
 
     async def list_servers(
         self,

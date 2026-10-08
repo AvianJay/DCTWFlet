@@ -17,7 +17,13 @@ from domain.discovery.value_objects import (
 from domain.discovery.entities import Bot
 from infrastructure.api import ApiKeyMissingError, InvalidApiKeyError
 from infrastructure.di import get_container
-from presentation.components import TagFilterDialog, Toast, build_avatar
+from presentation.components import (
+    PARTNER_BADGE_TAG,
+    TagFilterDialog,
+    Toast,
+    build_avatar,
+    build_partner_badge,
+)
 from presentation.tag_mappings import BOT_TAGS, BOT_TAG_FILTERS
 from presentation.url_helper import open_url
 
@@ -78,6 +84,12 @@ class BotListPage:
         self._rendered_count = 0
         self._page_size = 30
         self._load_seq = 0
+        # Partner badges: the public list endpoint stopped returning the flag,
+        # so the pills of the rendered cards are filled in later.
+        self._badge_rows: dict[int, ft.Row] = {}
+        self._partner_checked: set[int] = set()
+        self._partner_task_running = False
+        self._partner_task_dirty = False
         self._more_button = ft.Container(
             content=ft.TextButton(
                 "顯示更多",
@@ -274,6 +286,8 @@ class BotListPage:
         """Render the first page of the list"""
         self._items = list(bots)
         self._rendered_count = 0
+        self._badge_rows.clear()
+        self._partner_checked.clear()
         self.bot_list.controls.clear()
 
         if not self._items:
@@ -282,6 +296,7 @@ class BotListPage:
             self._append_bot_page()
 
         self.page.update()
+        self._request_partner_flags()
 
     def _has_active_filter(self) -> bool:
         """Is a tag filter or a search text currently applied?"""
@@ -347,6 +362,7 @@ class BotListPage:
             self.bot_list.controls.remove(self._more_button)
         if self._rendered_count < len(self._items):
             self.bot_list.controls.append(self._more_button)
+        self._request_partner_flags()
 
     def _show_more(self):
         """Show the next page of bots"""
@@ -413,9 +429,7 @@ class BotListPage:
         if bot.verified:
             badges.append(ft.Icon(ft.Icons.VERIFIED, color=ft.Colors.BLUE, size=16))
         if bot.is_partnered:
-            badges.append(
-                ft.Icon(ft.Icons.WORKSPACE_PREMIUM, color=ft.Colors.PURPLE, size=16)
-            )
+            badges.append(build_partner_badge())
         if bot.pinned:
             badges.append(
                 ft.Icon(ft.Icons.PUSH_PIN, color=ft.Colors.ORANGE, size=16)
@@ -430,20 +444,7 @@ class BotListPage:
                                 build_avatar(bot.avatar.value, radius=25),
                                 ft.Column(
                                     [
-                                        ft.Row(
-                                            [
-                                                ft.Text(
-                                                    bot.name,
-                                                    size=18,
-                                                    weight=ft.FontWeight.BOLD,
-                                                    expand=True,
-                                                    max_lines=1,
-                                                    overflow=ft.TextOverflow.ELLIPSIS,
-                                                ),
-                                                *badges,
-                                            ],
-                                            spacing=5,
-                                        ),
+                                        self._create_badge_row(bot, badges),
                                         ft.Row(
                                             [
                                                 ft.Icon(
@@ -479,7 +480,7 @@ class BotListPage:
                             [
                                 ft.Row(
                                     [
-                                        ft.Icon(ft.Icons.STAR, size=16),
+                                        ft.Icon(ft.Icons.HOW_TO_VOTE, size=16),
                                         ft.Text(
                                             str(bot.statistics.votes),
                                             size=14,
@@ -522,6 +523,79 @@ class BotListPage:
                 padding=15,
             ),
         )
+
+    def _create_badge_row(self, bot: Bot, badges: list[ft.Control]) -> ft.Row:
+        """Name row of a card, kept so the partner pill can be added later."""
+        row = ft.Row(
+            [
+                ft.Text(
+                    bot.name,
+                    size=18,
+                    weight=ft.FontWeight.BOLD,
+                    expand=True,
+                    max_lines=1,
+                    overflow=ft.TextOverflow.ELLIPSIS,
+                ),
+                *badges,
+            ],
+            spacing=5,
+        )
+        self._badge_rows[bot.id] = row
+        return row
+
+    def _request_partner_flags(self) -> None:
+        """Resolve the partner pills of the rendered cards in the background."""
+        if self._partner_task_running:
+            self._partner_task_dirty = True
+            return
+        self._partner_task_running = True
+        self.page.run_task(self._load_partner_flags)
+
+    async def _load_partner_flags(self) -> None:
+        """Fill in the partner pills the list payload no longer carries."""
+        try:
+            while True:
+                self._partner_task_dirty = False
+                bots = [
+                    bot
+                    for bot in self._items[: self._rendered_count]
+                    if not bot.is_partnered and bot.id not in self._partner_checked
+                ]
+                if not bots:
+                    return
+
+                self._partner_checked.update(bot.id for bot in bots)
+                flags = await self.discovery_service.resolve_partner_flags(
+                    [bot.id for bot in bots]
+                )
+                changed = False
+                for bot in bots:
+                    if flags.get(bot.id) and self._add_partner_badge(bot.id):
+                        changed = True
+                if changed:
+                    try:
+                        self.page.update()
+                    except Exception:
+                        logger.debug("Bot list closed before the badges arrived")
+                if not self._partner_task_dirty:
+                    return
+        except Exception as error:
+            logger.warning(f"Failed to resolve the partner badges: {error}")
+        finally:
+            self._partner_task_running = False
+
+    def _add_partner_badge(self, bot_id: int) -> bool:
+        """Add the partner pill to a rendered card; True when it changed."""
+        row = self._badge_rows.get(bot_id)
+        if row is None:
+            return False
+        if any(
+            getattr(control, "data", None) == PARTNER_BADGE_TAG
+            for control in row.controls
+        ):
+            return False
+        row.controls.append(build_partner_badge())
+        return True
 
     def _show_bot_detail(self, bot: Bot):
         """Show details"""
