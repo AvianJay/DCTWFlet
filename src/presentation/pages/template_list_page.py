@@ -17,7 +17,11 @@ from domain.discovery.value_objects import (
 from domain.discovery.entities import Template
 from infrastructure.api import ApiKeyMissingError, InvalidApiKeyError
 from infrastructure.di import get_container
-from presentation.components import TagFilterDialog, Toast
+from presentation.components import (
+    TagFilterDialog,
+    Toast,
+    build_partner_badge,
+)
 from presentation.tag_mappings import TEMPLATE_TAGS, TEMPLATE_TAG_FILTERS
 from presentation.url_helper import open_url
 
@@ -401,9 +405,13 @@ class TemplateListPage:
                 )
             )
 
-        pinned_icon = []
+        badges = []
+        if template.is_partnered:
+            badges.append(build_partner_badge())
         if template.pinned:
-            pinned_icon.append(ft.Icon(ft.Icons.PUSH_PIN, color=ft.Colors.ORANGE, size=16))
+            badges.append(
+                ft.Icon(ft.Icons.PUSH_PIN, color=ft.Colors.ORANGE, size=16)
+            )
 
         return ft.Card(
             content=ft.Container(
@@ -428,7 +436,7 @@ class TemplateListPage:
                                                     max_lines=1,
                                                     overflow=ft.TextOverflow.ELLIPSIS,
                                                 ),
-                                                *pinned_icon,
+                                                *badges,
                                             ],
                                             spacing=5,
                                         ),

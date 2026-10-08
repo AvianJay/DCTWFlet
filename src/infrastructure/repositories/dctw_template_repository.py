@@ -1,6 +1,7 @@
 """DCTW Template repository implementation"""
 
-from typing import List, Optional
+import asyncio
+from typing import Dict, List, Optional
 import logging
 
 from domain.discovery.repositories import TemplateRepository
@@ -31,6 +32,11 @@ class DctwTemplateRepository(TemplateRepository):
     """DCTW API-based Template repository implementation"""
 
     CACHE_KEY = "templates:all"
+    FLAGS_CACHE_KEY = "templates:partner_flags"
+
+    # Partner status changes very rarely, so the flag read from the website
+    # action is kept for hours instead of minutes.
+    PARTNER_TTL = 6 * 60 * 60
 
     def __init__(self, api_client: DctwApiClient, cache_manager: CacheManager):
         self._api_client = api_client
@@ -44,7 +50,17 @@ class DctwTemplateRepository(TemplateRepository):
             return [self._deserialize_template(data) for data in cached]
 
         logger.info("Fetching templates from API")
-        data = await self._api_client.get_templates()
+        data, partner_flags = await asyncio.gather(
+            self._api_client.get_templates(),
+            self._load_partner_flags(),
+        )
+        for item in data:
+            try:
+                flag = partner_flags.get(int(item.get("id")))
+            except (TypeError, ValueError):
+                flag = None
+            if flag is not None:
+                item["is_partnered"] = flag
         templates = [
             self._map_to_domain(item) for item in data if is_listed_item(item)
         ]
@@ -55,6 +71,39 @@ class DctwTemplateRepository(TemplateRepository):
 
         logger.info(f"Loaded {len(templates)} templates from API")
         return templates
+
+    async def _load_partner_flags(self) -> Dict[int, bool]:
+        """Return the partner flag of every template.
+
+        The public list endpoint does not carry the flag, so it is read from
+        the same website action the template page uses (in bulk, once).
+        """
+        cached = await self._cache.get(self.FLAGS_CACHE_KEY)
+        if isinstance(cached, dict):
+            flags: Dict[int, bool] = {}
+            for key, value in cached.items():
+                try:
+                    flags[int(key)] = to_bool(value)
+                except (TypeError, ValueError):
+                    continue
+            return flags
+
+        items = await self._api_client.get_template_flags()
+
+        flags = {}
+        for item in items:
+            try:
+                template_id = int(item.get("id"))
+            except (TypeError, ValueError):
+                continue
+            flags[template_id] = to_bool(item.get("partner"))
+
+        await self._cache.set(
+            self.FLAGS_CACHE_KEY,
+            {str(key): value for key, value in flags.items()},
+            ttl=self.PARTNER_TTL,
+        )
+        return flags
 
     async def find_by_id(self, template_id: int) -> Optional[Template]:
         """Find Template by ID.
@@ -127,6 +176,7 @@ class DctwTemplateRepository(TemplateRepository):
                 ),
             ),
             pinned=to_bool(data.get("pinned", False)),
+            is_partnered=to_bool(data.get("is_partnered", False)),
             social_links=parse_social_links(data.get("socialLinks")),
             author_ids=author_ids,
             comments=parse_comments(data.get("comments")),
@@ -146,6 +196,7 @@ class DctwTemplateRepository(TemplateRepository):
             "author_ids": template.author_ids,
             "created_at": template.timestamps.created_at.isoformat(),
             "bumped_at": template.timestamps.bumped_at.isoformat(),
+            "is_partnered": template.is_partnered,
             "socialLinks": template.social_links,
             "comments": serialize_comments(template.comments),
         }

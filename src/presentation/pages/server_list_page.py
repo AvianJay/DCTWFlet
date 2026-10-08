@@ -22,6 +22,7 @@ from presentation.components import (
     Toast,
     build_avatar,
     build_partner_badge,
+    build_server_type_badge,
 )
 from presentation.tag_mappings import SERVER_TAGS, SERVER_TAG_FILTERS
 from presentation.url_helper import open_url
@@ -406,7 +407,9 @@ class ServerListPage:
                 )
             )
 
-        badges = []
+        # The type pill mirrors the badge of the official website; it sits
+        # right next to the name, where the bot cards show the partner pill.
+        badges = [build_server_type_badge(server.features)]
         if server.is_partnered:
             badges.append(build_partner_badge())
         if server.pinned:

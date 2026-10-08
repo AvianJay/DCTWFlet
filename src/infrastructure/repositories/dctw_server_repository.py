@@ -158,6 +158,7 @@ class DctwServerRepository(ServerRepository):
         badge = data.get("badge") if isinstance(data.get("badge"), dict) else {}
         is_partnered = (
             to_bool(badge.get("partner"))
+            or to_bool(data.get("partner"))
             or to_bool(data.get("partnered"))
             or to_bool(data.get("is_partnered", False))
         )

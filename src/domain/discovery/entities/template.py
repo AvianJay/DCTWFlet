@@ -38,6 +38,7 @@ class Template(Entity[int]):
         social_links: Optional[Dict[str, str]] = None,
         author_ids: Optional[List[str]] = None,
         comments: Optional[List[Comment]] = None,
+        is_partnered: bool = False,
     ):
         super().__init__(id)
         self._validate_name(name)
@@ -54,6 +55,7 @@ class Template(Entity[int]):
         self._social_links = dict(social_links or {})
         self._author_ids = list(author_ids or [])
         self._comments = list(comments or [])
+        self._is_partnered = is_partnered
 
     @property
     def name(self) -> str:
@@ -62,6 +64,10 @@ class Template(Entity[int]):
     @property
     def pinned(self) -> bool:
         return self._pinned
+
+    @property
+    def is_partnered(self) -> bool:
+        return self._is_partnered
 
     @property
     def description(self) -> str:

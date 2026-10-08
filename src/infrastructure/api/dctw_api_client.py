@@ -62,6 +62,22 @@ class DctwApiClient:
     GET_BOT_ACTION = "601cebfbdd90674fa83db025737892d230455e1ffb"
     BOT_DETAIL_FIELDS = ["id", "partner", "slash", "author", "devs"]
 
+    # Server action used by the official website to read the template list
+    # (the public API does not expose the partner flag).
+    GET_TEMPLATES_ACTION = "40f4f4dea3c8c435aad6868ff7f72e170885f61f0a"
+    TEMPLATE_LIST_FIELDS = [
+        "id",
+        "name",
+        "description",
+        "introduce",
+        "tags",
+        "vote_count",
+        "bumped_at",
+        "comments",
+        "partner",
+        "keywords",
+    ]
+
     # Server action used by the official website to read a single server
     # record (the public API does not expose the admin list and only the
     # single item endpoint carries the comments).
@@ -315,6 +331,40 @@ class DctwApiClient:
     async def get_template(self, template_id: int) -> Optional[Dict[str, Any]]:
         """Get a single template by ID. Returns None when the API answers 404."""
         return await self._get_item(f"/templates/{template_id}/")
+
+    async def get_template_flags(self) -> List[Dict[str, Any]]:
+        """Read the template list from the official website.
+
+        Used for the fields the public API does not return (partner flag).
+        """
+        endpoint = "/templates/"
+        headers = {
+            "Next-Action": self.GET_TEMPLATES_ACTION,
+            "Content-Type": "text/plain;charset=UTF-8",
+            "Accept": "text/x-component",
+            "Origin": self._base_url,
+            "Referer": f"{self._base_url}{endpoint}",
+        }
+
+        try:
+            async with AsyncHttpClient(
+                self._base_url, headers={"User-Agent": self._user_agent}
+            ) as client:
+                payload = await client.post_text(
+                    endpoint,
+                    json.dumps([list(self.TEMPLATE_LIST_FIELDS)]),
+                    headers=headers,
+                )
+        except Exception as error:
+            logger.warning(f"Failed to load template flags: {error}")
+            return []
+
+        data = self._extract_action_payload(payload)
+        items = data.get("items") if isinstance(data, dict) else None
+        if not isinstance(items, list):
+            return []
+
+        return [item for item in items if isinstance(item, dict)]
 
     async def validate_api_key(self, api_key: Optional[str]) -> bool:
         """Check whether the DCTW API accepts the given API key.
@@ -602,11 +652,11 @@ class DctwApiClient:
         if not results:
             return None
 
-        # The website wraps its answers as {"ok": ..., "item": {...}}, which
-        # is preferred so a JSON looking string inside the payload can never
-        # shadow the real answer.
+        # The website wraps its answers as {"ok": ..., "item": {...}} or
+        # {"ok": ..., "items": [...]}, which is preferred so a JSON looking
+        # string inside the payload can never shadow the real answer.
         for _, value in reversed(results):
-            if isinstance(value, dict) and "item" in value:
+            if isinstance(value, dict) and ("item" in value or "items" in value):
                 return value
 
         lists = [value for _, value in results if isinstance(value, list)]
