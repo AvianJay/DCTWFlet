@@ -39,7 +39,14 @@ class ApiKeyDialog:
         self._on_close = on_close
 
         self._dialog: Optional[ft.AlertDialog] = None
-        self._status = ft.Text("請先在 DCTW 後台複製 API KEY，再點擊下方按鈕。", size=13)
+        # `expand` keeps the line inside the dialog: without it a narrow
+        # phone (or a bigger system font) renders the text wider than the
+        # dialog and the end of the sentence is clipped away.
+        self._status = ft.Text(
+            "請先在 DCTW 後台複製 API KEY，再點擊下方按鈕。",
+            size=13,
+            expand=True,
+        )
         self._progress = ft.ProgressRing(
             width=18, height=18, stroke_width=2, visible=False
         )
@@ -63,9 +70,16 @@ class ApiKeyDialog:
             title=ft.Row(
                 [
                     ft.Icon(ft.Icons.KEY, size=22),
-                    ft.Text("設定 DCTW API Key", weight=ft.FontWeight.BOLD),
+                    ft.Text(
+                        "設定 DCTW API Key",
+                        size=18,
+                        weight=ft.FontWeight.BOLD,
+                        # Wrap inside the dialog instead of overflowing it.
+                        expand=True,
+                    ),
                 ],
                 spacing=8,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
             ),
             content=ft.Column(
                 [
