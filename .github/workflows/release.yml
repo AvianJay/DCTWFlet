@@ -390,10 +390,10 @@ jobs:
           name: ${{ github.event.inputs.release_name }}
           body: ${{ github.event.inputs.release_body }}
           draft: true
+          # A release ships the phone builds only: the APK for Android and
+          # the IPA for iOS/iPadOS.
           files: |
             release_files/*.apk
             release_files/*.ipa
-            release_files/*.zip
-            release_files/*.aab
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
